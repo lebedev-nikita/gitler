@@ -432,3 +432,293 @@ fn restoring_a_rename_requires_selecting_separate_changes_at_its_source() {
     );
     assert!(!directory.path().join("renamed.txt").exists());
 }
+
+fn merged_worktree(directory: &TempDir, holder: &TempDir) -> std::path::PathBuf {
+    let working = holder.path().join("merged ü tree");
+    run(
+        directory.path(),
+        &[
+            "worktree",
+            "add",
+            "-b",
+            "agent/merged",
+            working.to_str().unwrap(),
+        ],
+    );
+    run(&working, &["commit", "--allow-empty", "-m", "Feature"]);
+    run(
+        directory.path(),
+        &["merge", "--no-ff", "agent/merged", "-m", "Merge feature"],
+    );
+    working
+}
+
+#[test]
+fn deletes_merged_branch_and_linked_worktree_without_touching_other_work() {
+    let directory = repo();
+    let holder = TempDir::new().unwrap();
+    let working = merged_worktree(&directory, &holder);
+    let root = directory.path().to_str().unwrap();
+    let head = run(&working, &["rev-parse", "HEAD"]);
+    run(directory.path(), &["tag", "keep", &head]);
+    run(
+        directory.path(),
+        &["update-ref", "refs/remotes/origin/agent/merged", &head],
+    );
+    run(
+        directory.path(),
+        &["config", "branch.agent/merged.remote", "origin"],
+    );
+    run(
+        directory.path(),
+        &[
+            "config",
+            "branch.agent/merged.merge",
+            "refs/heads/agent/merged",
+        ],
+    );
+    fs::write(directory.path().join("keep.txt"), "keep this work\n").unwrap();
+    let index = fs::read(directory.path().join(".git/index")).unwrap();
+    let snapshot = git::snapshot(working.to_str().unwrap(), 50).unwrap();
+    assert_eq!(
+        snapshot
+            .refs
+            .iter()
+            .find(|reference| reference.name == "agent/merged")
+            .unwrap()
+            .merged_into
+            .as_deref(),
+        Some("main")
+    );
+    assert!(snapshot
+        .refs
+        .iter()
+        .find(|reference| reference.name == "main")
+        .unwrap()
+        .merged_into
+        .is_none());
+    let plan = git::prepare_delete_branch(root, "agent/merged").unwrap();
+    assert_eq!(plan.worktrees.len(), 1);
+    let common = git::resolve_common(root).unwrap();
+    git::delete_branch(common.to_str().unwrap(), "agent/merged", &plan).unwrap();
+    assert!(!working.exists());
+    assert!(run(directory.path(), &["branch", "--list", "agent/merged"]).is_empty());
+    assert_eq!(run(directory.path(), &["rev-parse", "keep"]), head);
+    assert_eq!(
+        run(
+            directory.path(),
+            &["rev-parse", "refs/remotes/origin/agent/merged"]
+        ),
+        head
+    );
+    assert_eq!(
+        fs::read(directory.path().join(".git/index")).unwrap(),
+        index
+    );
+    assert_eq!(
+        fs::read_to_string(directory.path().join("keep.txt")).unwrap(),
+        "keep this work\n"
+    );
+}
+
+#[test]
+fn rejects_unmerged_branches_even_when_their_upstream_contains_the_tip() {
+    let directory = repo();
+    let holder = TempDir::new().unwrap();
+    let working = merged_worktree(&directory, &holder);
+    run(
+        &working,
+        &["commit", "--allow-empty", "-m", "Unmerged work"],
+    );
+    let head = run(&working, &["rev-parse", "HEAD"]);
+    run(
+        directory.path(),
+        &["update-ref", "refs/remotes/origin/agent/merged", &head],
+    );
+    let root = directory.path().to_str().unwrap();
+    assert!(git::prepare_delete_branch(root, "agent/merged")
+        .unwrap_err()
+        .contains("not been merged"));
+    assert!(git::snapshot(root, 50)
+        .unwrap()
+        .refs
+        .iter()
+        .find(|reference| reference.name == "agent/merged")
+        .unwrap()
+        .merged_into
+        .is_none());
+    assert!(working.exists());
+}
+
+#[test]
+fn changed_untracked_and_ignored_files_abort_deletion_after_preview() {
+    for kind in ["staged", "unstaged", "untracked", "ignored"] {
+        let directory = repo();
+        let holder = TempDir::new().unwrap();
+        let working = merged_worktree(&directory, &holder);
+        let root = directory.path().to_str().unwrap();
+        let plan = git::prepare_delete_branch(root, "agent/merged").unwrap();
+        let path = if kind == "staged" || kind == "unstaged" {
+            "first.txt"
+        } else {
+            "private.txt"
+        };
+        fs::write(working.join(path), "keep these edits\n").unwrap();
+        if kind == "staged" {
+            run(&working, &["add", path]);
+        }
+        if kind == "ignored" {
+            fs::write(directory.path().join(".git/info/exclude"), "private.txt\n").unwrap();
+        }
+        assert!(
+            git::delete_branch(root, "agent/merged", &plan).is_err(),
+            "{kind}"
+        );
+        assert_eq!(
+            fs::read_to_string(working.join(path)).unwrap(),
+            "keep these edits\n"
+        );
+        assert_eq!(run(&working, &["branch", "--show-current"]), "agent/merged");
+    }
+}
+
+#[test]
+fn changed_branch_base_checkout_or_worktree_set_invalidates_confirmation() {
+    for change in ["branch", "base", "checkout", "new worktree", "locked"] {
+        let directory = repo();
+        let holder = TempDir::new().unwrap();
+        let working = merged_worktree(&directory, &holder);
+        let root = directory.path().to_str().unwrap();
+        let plan = git::prepare_delete_branch(root, "agent/merged").unwrap();
+        match change {
+            "branch" => {
+                run(&working, &["commit", "--allow-empty", "-m", "New feature"]);
+            }
+            "base" => {
+                run(
+                    directory.path(),
+                    &["commit", "--allow-empty", "-m", "Main moved"],
+                );
+            }
+            "checkout" => {
+                run(&working, &["switch", "--detach"]);
+            }
+            "new worktree" => {
+                run(
+                    directory.path(),
+                    &[
+                        "worktree",
+                        "add",
+                        "--force",
+                        holder.path().join("second").to_str().unwrap(),
+                        "agent/merged",
+                    ],
+                );
+            }
+            "locked" => {
+                run(
+                    directory.path(),
+                    &["worktree", "lock", working.to_str().unwrap()],
+                );
+            }
+            _ => unreachable!(),
+        }
+        assert!(
+            git::delete_branch(root, "agent/merged", &plan).is_err(),
+            "{change}"
+        );
+        assert!(working.exists());
+        assert!(!run(directory.path(), &["branch", "--list", "agent/merged"]).is_empty());
+    }
+}
+
+#[test]
+fn main_branch_main_worktree_and_foreign_repository_are_protected() {
+    let directory = repo();
+    let holder = TempDir::new().unwrap();
+    let working = merged_worktree(&directory, &holder);
+    let root = directory.path().to_str().unwrap();
+    let plan = git::prepare_delete_branch(root, "agent/merged").unwrap();
+    assert!(git::prepare_delete_branch(root, "main").is_err());
+    run(directory.path(), &["branch", "master"]);
+    assert!(git::prepare_delete_branch(root, "master").is_err());
+    run(directory.path(), &["switch", "-c", "main-copy"]);
+    assert!(git::prepare_delete_branch(root, "main-copy")
+        .unwrap_err()
+        .contains("main worktree"));
+    fs::remove_file(working.join(".git")).unwrap();
+    run(&working, &["init", "-b", "foreign"]);
+    assert!(git::delete_branch(root, "agent/merged", &plan).is_err());
+    assert!(working.join("first.txt").exists());
+}
+
+#[test]
+fn deletes_all_reviewed_worktrees_and_supports_branches_without_a_worktree() {
+    let directory = repo();
+    let holder = TempDir::new().unwrap();
+    let working = merged_worktree(&directory, &holder);
+    let second = holder.path().join("second");
+    run(
+        directory.path(),
+        &[
+            "worktree",
+            "add",
+            "--force",
+            second.to_str().unwrap(),
+            "agent/merged",
+        ],
+    );
+    let root = directory.path().to_str().unwrap();
+    let plan = git::prepare_delete_branch(root, "agent/merged").unwrap();
+    assert_eq!(plan.worktrees.len(), 2);
+    git::delete_branch(root, "agent/merged", &plan).unwrap();
+    assert!(!working.exists());
+    assert!(!second.exists());
+    run(directory.path(), &["branch", "merged/no-tree"]);
+    let plan = git::prepare_delete_branch(root, "merged/no-tree").unwrap();
+    assert!(plan.worktrees.is_empty());
+    git::delete_branch(root, "merged/no-tree", &plan).unwrap();
+}
+
+#[test]
+fn merge_detection_uses_full_history_and_configured_default_branch() {
+    let directory = repo();
+    let root = directory.path().to_str().unwrap();
+    run(directory.path(), &["branch", "old/merged"]);
+    run(directory.path(), &["branch", "-m", "main", "trunk"]);
+    let head = run(directory.path(), &["rev-parse", "HEAD"]);
+    run(
+        directory.path(),
+        &["update-ref", "refs/remotes/origin/trunk", &head],
+    );
+    run(
+        directory.path(),
+        &[
+            "symbolic-ref",
+            "refs/remotes/origin/HEAD",
+            "refs/remotes/origin/trunk",
+        ],
+    );
+    for _ in 0..55 {
+        run(
+            directory.path(),
+            &["commit", "--allow-empty", "-m", "Later"],
+        );
+    }
+    let snapshot = git::snapshot(root, 50).unwrap();
+    assert!(snapshot.has_more);
+    assert!(!snapshot.commits.iter().any(|commit| commit.oid == head));
+    assert_eq!(
+        snapshot
+            .refs
+            .iter()
+            .find(|reference| reference.name == "old/merged")
+            .unwrap()
+            .merged_into
+            .as_deref(),
+        Some("trunk")
+    );
+    assert!(git::prepare_delete_branch(root, "trunk").is_err());
+    let plan = git::prepare_delete_branch(root, "old/merged").unwrap();
+    git::delete_branch(root, "old/merged", &plan).unwrap();
+}

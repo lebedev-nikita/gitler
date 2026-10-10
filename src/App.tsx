@@ -554,6 +554,20 @@ export default function App() {
           snapshot={snapshot}
           close={() => setGraphAction(null)}
           changed={async () => {
+            if (graphAction.kind === "delete") {
+              setComparison(null);
+              if (
+                selected?.kind === "worktree" &&
+                snapshot.worktrees.some(
+                  (tree) => tree.path === selected.path && tree.branch === graphAction.branch,
+                )
+              ) {
+                const branch = snapshot.refs.find(
+                  (ref) => ref.kind === "branch" && ref.name === graphAction.branch,
+                );
+                setSelected(branch ? { kind: "commit", oid: branch.oid } : null);
+              }
+            }
             await queryClient.invalidateQueries({ queryKey: ["repository"] });
             await queryClient.invalidateQueries({ queryKey: ["detail"] });
             await queryClient.invalidateQueries({ queryKey: ["diff"] });

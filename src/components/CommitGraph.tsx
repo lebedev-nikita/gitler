@@ -117,6 +117,11 @@ export function CommitGraph({
   const [scrollTop, setScrollTop] = useState(0);
   const nodes = useMemo(() => repositoryNodes(snapshot), [snapshot]);
   const mainline = useMemo(() => mainlineIds(snapshot, nodes), [snapshot, nodes]);
+  useEffect(() => {
+    if (branch !== "all" && !snapshot.refs.some((ref) => ref.fullName === branch)) {
+      setBranch("all");
+    }
+  }, [branch, snapshot.refs]);
   const filtered = useMemo(() => {
     const reference = snapshot.refs.find((reference) => reference.fullName === branch);
     const reachable = reference ? ancestorIds(nodes, [reference.oid]) : null;
@@ -546,6 +551,47 @@ export function CommitGraph({
                                   : `Discard changes on ${tree.branch ?? tree.path}…`}
                               </ContextMenuItem>
                             ))}
+                            {branches
+                              .filter((branch) =>
+                                snapshot.refs.some(
+                                  (ref) =>
+                                    ref.kind === "branch" && ref.name === branch && ref.mergedInto,
+                                ),
+                              )
+                              .map((branch) => {
+                                const trees = snapshot.worktrees.filter(
+                                  (tree) => tree.branch === branch,
+                                );
+                                return (
+                                  <ContextMenuItem
+                                    key={`delete:${branch}`}
+                                    variant="destructive"
+                                    disabled={trees.some(
+                                      (tree) =>
+                                        tree.path === snapshot.path ||
+                                        tree.bare ||
+                                        tree.locked !== null ||
+                                        tree.prunable !== null ||
+                                        tree.error !== null ||
+                                        tree.files.length > 0,
+                                    )}
+                                    onClick={() =>
+                                      act({
+                                        kind: "delete",
+                                        branch,
+                                        worktree: trees[0]?.path ?? null,
+                                      })
+                                    }
+                                  >
+                                    <Trash2 />
+                                    {branches.length === 1
+                                      ? trees.length > 0
+                                        ? "Delete branch and worktree…"
+                                        : "Delete branch…"
+                                      : `Delete ${branch}${trees.length > 0 ? " and worktree" : ""}…`}
+                                  </ContextMenuItem>
+                                );
+                              })}
                           </ContextMenuGroup>
                         </>
                       )}

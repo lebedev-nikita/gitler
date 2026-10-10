@@ -3,6 +3,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { DEMO_PATH, demoDetail, demoDiff, demoSnapshot } from "./demo";
 import {
   BranchSuggestionSchema,
+  DeleteBranchPlanSchema,
   DiscardPlanSchema,
   DetailSchema,
   DiffSchema,
@@ -10,6 +11,7 @@ import {
 } from "./models";
 import type {
   Comparison,
+  DeleteBranchPlan,
   Detail,
   DiffMode,
   DiffRequest,
@@ -186,6 +188,12 @@ export const repositoryApi = {
     ),
   prepareDiscard: (commonDir: string, worktree: string) =>
     runtime.runPromise(action(commonDir, "prepare_discard", { worktree }, DiscardPlanSchema)),
+  prepareDeleteBranch: (commonDir: string, branch: string) =>
+    runtime.runPromise(
+      action(commonDir, "prepare_delete_branch", { branch }, DeleteBranchPlanSchema),
+    ),
+  deleteBranch: (commonDir: string, branch: string, expected: DeleteBranchPlan) =>
+    runtime.runPromise(action(commonDir, "delete_branch", { branch, expected }, Schema.Null)),
   discardChanges: (
     commonDir: string,
     worktree: string,

@@ -39,7 +39,8 @@ visibility are remembered. Focus a boundary and use the arrow keys to resize it
 with the keyboard.
 
 Right-click a local branch label, its tip commit, or an uncommitted node to rename
-the branch with Codex or discard its working changes. Renaming requires a current
+the branch with Codex, discard its working changes, or delete a merged branch with
+its linked worktrees. Renaming requires a current
 [Codex CLI](https://developers.openai.com/codex/cli) installation and `codex login`;
 Gitler detects common installation paths and accepts an explicit executable path.
 The selected branch's commits and working diffs are sent to Codex for generation.
@@ -48,8 +49,14 @@ The suggested name is editable before applying a local rename; remote names are 
 Discarding restores selected files to HEAD in both the index and working copy.
 Selected untracked and newly added files are deleted permanently. Gitler verifies
 that the reviewed files and HEAD have not changed; submodules and nested repositories
-must be handled separately. Apart from background remote updates, other Git mutations
-remain outside the application's scope.
+must be handled separately.
+
+Deletion requires confirmation and a merge into the local default branch. Main branches
+and the main worktree are protected; worktrees with changed, untracked, or ignored files
+must be cleaned first. Locked or unavailable worktrees cannot be deleted.
+
+Git mutations beyond remote updates, renaming, selected-file discards, and merged-branch
+deletion remain outside the application's scope.
 
 Remote branches update when you open a repository and every minute afterward. Use
 **Refresh** to update them immediately. The status bar shows the last successful

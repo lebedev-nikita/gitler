@@ -1,10 +1,19 @@
 import { expect, test } from "@playwright/test";
 import { demoSnapshot } from "../src/lib/demo";
 
-async function mockDesktop(page: import("@playwright/test").Page, fail = false, slow = false) {
+async function mockDesktop(
+  page: import("@playwright/test").Page,
+  fail = false,
+  slow = false,
+  deleteFailure = false,
+) {
   const snapshot = { ...demoSnapshot(), commonDir: "/fixture/.git" };
+  snapshot.refs = snapshot.refs.map((ref) => ({
+    ...ref,
+    mergedInto: ["feature/worktree-map", "agent/cleanup"].includes(ref.name) ? "main" : null,
+  }));
   await page.addInitScript(
-    ({ snapshot, fail, slow }) => {
+    ({ snapshot, fail, slow, deleteFailure }) => {
       const current = window as unknown as {
         isTauri: boolean;
         __TAURI_INTERNALS__: unknown;
@@ -38,6 +47,26 @@ async function mockDesktop(page: import("@playwright/test").Page, fail = false, 
             if (slow) await new Promise((resolve) => setTimeout(resolve, 2000));
             if (fail) throw "Codex login is required";
             return { branchName: "agent/improve-auth-refresh", head: snapshot.worktrees[1].head };
+          }
+          if (command === "prepare_delete_branch") {
+            const ref = snapshot.refs.find((ref) => ref.name === args.branch)!;
+            return {
+              head: ref.oid,
+              mergedInto: "main",
+              baseHead: snapshot.refs[0].oid,
+              worktrees: snapshot.worktrees
+                .filter((tree) => tree.branch === args.branch)
+                .map((tree) => tree.path),
+            };
+          }
+          if (command === "delete_branch") {
+            if (deleteFailure)
+              throw "The branch or its worktrees changed. Reopen the delete dialog to review them.";
+            snapshot.worktrees = snapshot.worktrees.filter((tree) => tree.branch !== args.branch);
+            snapshot.refs = snapshot.refs.filter(
+              (ref) => ref.kind !== "branch" || ref.name !== args.branch,
+            );
+            return null;
           }
           if (command === "prepare_discard") {
             const tree = snapshot.worktrees.find((tree) => tree.path === args.worktree)!;
@@ -85,7 +114,7 @@ async function mockDesktop(page: import("@playwright/test").Page, fail = false, 
       };
       current.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => undefined };
     },
-    { snapshot, fail, slow },
+    { snapshot, fail, slow, deleteFailure },
   );
 }
 
@@ -220,4 +249,98 @@ test("discard dialog fits the minimum desktop window and requires a file selecti
     fullPage: true,
     animations: "disabled",
   });
+});
+
+test("merged branch deletion reviews the worktree, applies the preview and refreshes the graph", async ({
+  page,
+}) => {
+  await mockDesktop(page);
+  await page.setViewportSize({ width: 900, height: 600 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Toggle graph filters" }).click();
+  await page.getByLabel("Filter history by branch").selectOption("refs/heads/feature/worktree-map");
+  await page
+    .getByRole("button", { name: "Add worktree map to the interface", exact: true })
+    .getByText("feature/worktree-map", { exact: true })
+    .click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Delete branch and worktree…", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Delete merged branch" });
+  await expect(dialog).toContainText("feature/worktree-map");
+  await expect(dialog).toContainText("Merged into main");
+  await expect(dialog.getByRole("list", { name: "Worktrees to delete" })).toContainText(
+    "/Users/alex/Projects/gitler-worktrees/worktree-map",
+  );
+  const remove = dialog.getByRole("button", { name: "Delete branch and worktree", exact: true });
+  await expect(remove).toBeEnabled();
+  await expect(remove).toBeInViewport();
+  await page.screenshot({
+    path: ".impeccable/review/delete-branch.png",
+    fullPage: true,
+    animations: "disabled",
+  });
+  await remove.click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('[data-local-branch="feature/worktree-map"]')).toHaveCount(0);
+  await expect(page.getByLabel("Filter history by branch")).toHaveValue("all");
+  const call = await page.evaluate(() =>
+    (window as unknown as { calls: Array<{ command: string; args: unknown }> }).calls.find(
+      (call) => call.command === "delete_branch",
+    ),
+  );
+  expect(call?.args).toMatchObject({
+    commonDir: "/fixture/.git",
+    branch: "feature/worktree-map",
+    expected: {
+      head: demoSnapshot().worktrees[3].head,
+      baseHead: demoSnapshot().refs[0].oid,
+      mergedInto: "main",
+      worktrees: ["/Users/alex/Projects/gitler-worktrees/worktree-map"],
+    },
+  });
+});
+
+test("deletion is hidden for unmerged and main branches and disabled for dirty worktrees", async ({
+  page,
+}) => {
+  await mockDesktop(page);
+  await page.goto("/");
+  for (const branch of ["agent/auth-flow", "main"]) {
+    await page.locator(`[data-local-branch="${branch}"]`).first().click({ button: "right" });
+    await expect(page.getByRole("menuitem", { name: /^Delete / })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+  }
+  await page
+    .getByRole("button", { name: "Uncommitted changes on agent/cleanup", exact: true })
+    .click({ button: "right" });
+  await expect(
+    page.getByRole("menuitem", { name: "Delete branch and worktree…", exact: true }),
+  ).toBeDisabled();
+});
+
+test("cancel keeps a merged branch and stale confirmation errors keep the dialog open", async ({
+  page,
+}) => {
+  await mockDesktop(page, false, false, true);
+  await page.goto("/");
+  const branch = page.locator('[data-local-branch="feature/worktree-map"]');
+  await branch.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Delete branch and worktree…", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Cancel", exact: true }).click();
+  expect(
+    await page.evaluate(() =>
+      (window as unknown as { calls: Array<{ command: string }> }).calls.some(
+        (call) => call.command === "delete_branch",
+      ),
+    ),
+  ).toBe(false);
+  await branch.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Delete branch and worktree…", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Delete branch and worktree", exact: true }).click();
+  await expect(dialog).toContainText("Reopen the delete dialog");
+  await expect(
+    dialog.getByRole("button", { name: "Delete branch and worktree", exact: true }),
+  ).toBeDisabled();
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(branch).toBeVisible();
 });
