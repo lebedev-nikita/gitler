@@ -23,7 +23,14 @@ import {
   ContextMenuLabel,
   ContextMenuSeparator,
 } from "@/components/ui/context-menu";
-import { ancestorIds, layoutGraph, LANE_WIDTH, repositoryNodes, ROW_HEIGHT } from "@/lib/graph";
+import {
+  ancestorIds,
+  layoutGraph,
+  LANE_WIDTH,
+  mainlineIds,
+  repositoryNodes,
+  ROW_HEIGHT,
+} from "@/lib/graph";
 import type { GraphRow } from "@/lib/graph";
 import type { Comparison, GraphAction, Selection, Snapshot } from "@/lib/models";
 import { selectionId } from "@/lib/models";
@@ -108,6 +115,7 @@ export function CommitGraph({
   const lastPosition = useRef<{ id: string; index: number } | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const nodes = useMemo(() => repositoryNodes(snapshot), [snapshot]);
+  const mainline = useMemo(() => mainlineIds(snapshot, nodes), [snapshot, nodes]);
   const filtered = useMemo(() => {
     const reference = snapshot.refs.find((reference) => reference.fullName === branch);
     const reachable = reference ? ancestorIds(nodes, [reference.oid]) : null;
@@ -141,7 +149,7 @@ export function CommitGraph({
       );
     });
   }, [nodes, snapshot.refs, branch, deferredSearch, onlyChanges]);
-  const graph = useMemo(() => layoutGraph(filtered), [filtered]);
+  const graph = useMemo(() => layoutGraph(filtered, mainline), [filtered, mainline]);
   useEffect(() => {
     const viewport = scroll.current;
     if (!viewport || !selected) return;

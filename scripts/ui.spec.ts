@@ -8,6 +8,22 @@ test("repository graph, working nodes, context-menu comparisons and filters", as
   await expect(page.getByRole("button", { name: /^Uncommitted changes on/ })).toHaveCount(3);
   await expect(page.getByLabel("Selection details")).toContainText("agent/auth-flow");
   await expect(page.getByLabel("Diff for src/auth/session.ts")).toBeVisible();
+  for (const subject of [
+    "Add repository-wide worktree discovery",
+    "Merge branch 'feature/worktree-map'",
+    "Merge branch 'fix/empty-state'",
+    "Initial commit",
+  ]) {
+    await expect(
+      page.getByRole("button", { name: subject, exact: true }).locator("svg circle").first(),
+    ).toHaveAttribute("cx", "20");
+  }
+  await expect(
+    page
+      .getByRole("button", { name: "Handle renamed files in status parser", exact: true })
+      .locator("svg circle")
+      .first(),
+  ).not.toHaveAttribute("cx", "20");
   const patch = page.getByLabel("Diff for src/auth/session.ts");
   expect((await patch.boundingBox())?.height).toBeGreaterThanOrEqual(180);
   await page.screenshot({ path: ".impeccable/review/desktop.png", fullPage: true });

@@ -100,35 +100,75 @@ export function ancestorIds(nodes: readonly GraphNode[], tips: readonly string[]
   return ids;
 }
 
-export function layoutGraph(nodes: readonly GraphNode[]): { rows: GraphRow[]; width: number } {
+export function mainlineIds(snapshot: Snapshot, nodes: readonly GraphNode[]): Set<string> {
+  const candidates = [
+    "refs/heads/main",
+    "refs/heads/master",
+    "refs/remotes/origin/main",
+    "refs/remotes/origin/master",
+    "refs/remotes/origin/HEAD",
+  ];
+  const reference = candidates
+    .map((name) => snapshot.refs.find((reference) => reference.fullName === name))
+    .find((reference) => reference !== undefined);
+  if (!reference) return new Set();
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const ids = new Set<string>();
+  let id: string | undefined = reference.oid;
+  while (id && !ids.has(id)) {
+    ids.add(id);
+    id = byId.get(id)?.parents[0];
+  }
+  for (const node of nodes) {
+    if (node.worktree?.branch === reference.name && node.worktree.head === reference.oid)
+      ids.add(node.id);
+  }
+  return ids;
+}
+
+export function layoutGraph(
+  nodes: readonly GraphNode[],
+  mainline: ReadonlySet<string> = new Set(),
+): { rows: GraphRow[]; width: number } {
   const lanes: (string | undefined)[] = [];
   const colors = new Map<string, string>();
   const availableIds = new Set(nodes.map((node) => node.id));
-  let colorIndex = 0;
+  const pinned = nodes.filter((node) => mainline.has(node.id));
+  let pinnedIndex = 0;
+  let colorIndex = pinned.length ? 1 : 0;
   let maximum = 1;
   const freeLane = () => {
-    const empty = lanes.findIndex((value) => value === undefined);
-    return empty >= 0 ? empty : lanes.length;
+    const first = pinned.length ? 1 : 0;
+    for (let index = first; index < lanes.length; index++) {
+      if (lanes[index] === undefined) return index;
+    }
+    return Math.max(first, lanes.length);
   };
   const rows = nodes.map((node) => {
-    let lane = lanes.indexOf(node.id);
-    const hasTop = lane >= 0;
+    const incoming = lanes.indexOf(node.id);
+    const isMainline = mainline.has(node.id);
+    let lane = isMainline ? 0 : incoming;
+    const hasTop = incoming >= 0;
     if (lane < 0) {
       lane = freeLane();
-      lanes[lane] = node.id;
     }
-    const color = colors.get(node.id) ?? LANE_COLORS[colorIndex++ % LANE_COLORS.length];
+    if (!hasTop) lanes[lane] = node.id;
+    if (isMainline) pinnedIndex++;
+    const color = isMainline
+      ? LANE_COLORS[0]
+      : (colors.get(node.id) ?? LANE_COLORS[colorIndex++ % LANE_COLORS.length]);
     const before = [...lanes];
     const segments: GraphSegment[] = [];
     for (let index = 0; index < before.length; index++) {
-      if (!before[index] || (index === lane && !hasTop)) continue;
+      if (!before[index] || (before[index] === node.id && !hasTop)) continue;
       segments.push({
         from: index,
-        to: index,
+        to: before[index] === node.id ? lane : index,
         half: "top",
         color: colors.get(before[index]!) ?? color,
       });
     }
+    if (incoming >= 0) lanes[incoming] = undefined;
     lanes[lane] = undefined;
     node.parents.forEach((parent, index) => {
       if (!availableIds.has(parent)) {
@@ -137,9 +177,23 @@ export function layoutGraph(nodes: readonly GraphNode[]): { rows: GraphRow[]; wi
       }
       let destination = lanes.indexOf(parent);
       if (destination < 0) {
-        destination = index === 0 && lanes[lane] === undefined ? lane : freeLane();
+        // A side branch may reach an older mainline commit before the mainline
+        // tip is drawn. Keep that edge on the right until its actual join row.
+        destination =
+          parent === pinned[pinnedIndex]?.id
+            ? 0
+            : index === 0 && (!pinned.length || lane > 0) && lanes[lane] === undefined
+              ? lane
+              : freeLane();
         lanes[destination] = parent;
-        colors.set(parent, index === 0 ? color : LANE_COLORS[colorIndex++ % LANE_COLORS.length]);
+        colors.set(
+          parent,
+          mainline.has(parent)
+            ? LANE_COLORS[0]
+            : index === 0
+              ? color
+              : LANE_COLORS[colorIndex++ % LANE_COLORS.length],
+        );
       }
       segments.push({
         from: lane,
@@ -150,7 +204,7 @@ export function layoutGraph(nodes: readonly GraphNode[]): { rows: GraphRow[]; wi
       });
     });
     for (let index = 0; index < before.length; index++) {
-      if (index === lane || !before[index]) continue;
+      if (before[index] === node.id || !before[index]) continue;
       segments.push({
         from: index,
         to: index,

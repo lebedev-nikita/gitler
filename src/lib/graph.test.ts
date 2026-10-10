@@ -4,6 +4,7 @@ import {
   ancestorIds,
   DIRTY_COLOR,
   layoutGraph,
+  mainlineIds,
   mergeCommitHistory,
   repositoryNodes,
 } from "./graph";
@@ -71,6 +72,94 @@ describe("repository graph", () => {
     expect(graph.rows[1].lane).not.toEqual(graph.rows[2].lane);
     expect(graph.rows[3].segments.filter((segment) => segment.half === "top")).toHaveLength(1);
     expect(graph.rows[4].lane).toEqual(0);
+  });
+
+  it.each(["main", "master"])(
+    "pins %s and its first-parent history behind newer branches",
+    (name) => {
+      const demo = demoSnapshot();
+      const snapshot = {
+        ...demo,
+        refs: [{ ...demo.refs[0], name, fullName: `refs/heads/${name}`, oid: "tip" }],
+      };
+      const nodes = [
+        { id: "feature", subject: "newer feature", parents: ["root"] },
+        { id: "tip", subject: "mainline merge", parents: ["parent", "side"] },
+        { id: "side", subject: "merged feature", parents: ["root"] },
+        { id: "parent", subject: "mainline parent", parents: ["root"] },
+        { id: "root", subject: "shared root", parents: [] },
+      ];
+      const mainline = mainlineIds(snapshot, nodes);
+      expect([...mainline]).toEqual(["tip", "parent", "root"]);
+      const graph = layoutGraph(nodes, mainline);
+      expect(
+        graph.rows.filter((row) => mainline.has(row.node.id)).every((row) => row.lane === 0),
+      ).toBe(true);
+      expect(
+        graph.rows.filter((row) => !mainline.has(row.node.id)).every((row) => row.lane > 0),
+      ).toBe(true);
+      expect(graph.rows[0].segments).toEqual([
+        expect.objectContaining({ from: 1, to: 1, half: "bottom" }),
+      ]);
+      expect(graph.rows[4].segments).toContainEqual(
+        expect.objectContaining({ from: 1, to: 0, half: "top" }),
+      );
+      // Every edge crosses the row boundary at the same lane on both sides.
+      for (let index = 1; index < graph.rows.length; index++) {
+        const bottom = graph.rows[index - 1].segments
+          .filter((segment) => segment.half === "bottom")
+          .map((segment) => segment.to)
+          .sort();
+        const top = graph.rows[index].segments
+          .filter((segment) => segment.half === "top")
+          .map((segment) => segment.from)
+          .sort();
+        expect(new Set(top)).toEqual(new Set(bottom));
+      }
+    },
+  );
+
+  it("pins mainline working changes and keeps the lane when the tip is filtered out", () => {
+    const demo = demoSnapshot();
+    const snapshot = {
+      ...demo,
+      worktrees: [
+        { ...demo.worktrees[0], files: demo.worktrees[1].files },
+        ...demo.worktrees.slice(1),
+      ],
+    };
+    const nodes = repositoryNodes(snapshot);
+    const mainline = mainlineIds(snapshot, nodes);
+    expect(mainline.has(`working:${snapshot.worktrees[0].path}`)).toBe(true);
+    const filtered = nodes.filter((node) => node.id !== oid(1));
+    const graph = layoutGraph(filtered, mainline);
+    expect(
+      graph.rows.filter((row) => mainline.has(row.node.id)).every((row) => row.lane === 0),
+    ).toBe(true);
+    const onlyFeature = nodes.filter((node) => node.id === oid(2));
+    expect(layoutGraph(onlyFeature, mainline).rows[0].lane).toBe(0);
+  });
+
+  it("falls back to remote mainlines and leaves repositories without one compact", () => {
+    const demo = demoSnapshot();
+    const snapshot = {
+      ...demo,
+      refs: demo.refs.filter((reference) => reference.kind === "remote"),
+    };
+    const nodes = repositoryNodes(snapshot);
+    expect(mainlineIds(snapshot, nodes).has(oid(1))).toBe(true);
+    snapshot.refs = [
+      {
+        ...snapshot.refs[0],
+        name: "origin/HEAD",
+        fullName: "refs/remotes/origin/HEAD",
+        oid: oid(2),
+      },
+    ];
+    expect(mainlineIds(snapshot, nodes).has(oid(2))).toBe(true);
+    const withoutMainline = { ...snapshot, refs: [] };
+    expect(mainlineIds(withoutMainline, nodes).size).toBe(0);
+    expect(layoutGraph(nodes, mainlineIds(withoutMainline, nodes))).toEqual(layoutGraph(nodes));
   });
 
   it("shows unborn worktree changes even with no commits", () => {

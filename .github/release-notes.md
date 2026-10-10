@@ -1,12 +1,10 @@
-Gitler 0.3.0 tracks remote branches automatically and opens remote repositories from the app.
+Gitler 0.3.1 keeps the main branch at the left edge of the commit graph.
 
 ## Changes
 
-- Fetch remote branches when a repository opens and every minute in the background. New commits and branches appear in the graph without changing local branches, tags, indexes, or working files.
-- Open the primary remote from the toolbar, and open any supported remote from repository information. GitHub HTTPS and SSH addresses resolve to browser links.
-- Show remote update progress, the last successful update, and network or authentication failures in the status bar. Retry from repository information or use Refresh.
-- Preserve the last fetched history when offline. Git authentication remains managed by your existing Git setup.
-- Support and publish only macOS builds for Apple Silicon.
+- Pin `main` or `master` and its first-parent history to the leftmost graph lane, even when other branches have newer commits.
+- Keep mainline working changes on the same lane and preserve the position when searching or filtering history.
+- Preserve connections to older mainline commits when drawing branches and merges.
 
 ## Downloads
 
