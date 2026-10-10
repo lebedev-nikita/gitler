@@ -1,37 +1,69 @@
-name: Desktop release
+name: Desktop checks and release
 
 on:
   push:
+    branches: ["main"]
     tags: ["v*"]
+  pull_request:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing version tag to build
-        required: true
-        default: v0.2.0
+        description: Existing version tag (leave empty to build the selected ref)
+        required: false
+      publish:
+        description: Publish the tagged release after all platforms succeed
+        type: boolean
+        default: false
+      check_budget:
+        description: Enforce the five-minute budget (run after warming the cache)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ inputs.tag || github.ref_name }}
-  cancel-in-progress: false
+  group: desktop-${{ (startsWith(github.ref, 'refs/tags/') || inputs.publish) && 'release' || 'check' }}-${{ inputs.tag || github.head_ref || github.ref_name }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') && !inputs.publish }}
 
 jobs:
   prepare:
     runs-on: ubuntu-22.04
     permissions:
       contents: write
+    timeout-minutes: 5
     outputs:
+      ref: ${{ inputs.tag || github.sha }}
+      tauri_cli: ${{ steps.cli.outputs.version }}
       release_id: ${{ steps.release.outputs.id }}
       tag: ${{ steps.release.outputs.tag }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ inputs.tag || github.ref }}
-      - name: Test release publication
-        run: python3 -m unittest discover -s scripts -p 'test_release.py'
+          ref: ${{ inputs.tag || github.sha }}
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.2
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile
+      - name: Check and test frontend
+        run: |
+          bun run check
+          bun run test
+          python3 -m unittest discover -s scripts -p 'test_release.py'
+      - name: Build frontend once for every platform
+        run: bun run build
+      - name: Resolve the locked Tauri CLI version
+        id: cli
+        run: bun -e 'console.log("version=" + require("./node_modules/@tauri-apps/cli/package.json").version)' >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: frontend
+          path: dist
+          if-no-files-found: error
+          retention-days: 1
       - name: Verify version and create draft release
+        if: startsWith(github.ref, 'refs/tags/') || inputs.publish
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -43,7 +75,7 @@ jobs:
     name: ${{ matrix.name }}
     needs: prepare
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 75
+    timeout-minutes: 15
     permissions:
       contents: write
     strategy:
@@ -83,12 +115,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ needs.prepare.outputs.tag }}
+          ref: ${{ needs.prepare.outputs.ref }}
       - name: Install Linux system dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf libfuse2 rpm
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev build-essential libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf libfuse2 rpm
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.4.2
@@ -99,15 +131,16 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           workspaces: src-tauri -> target
-          key: ${{ matrix.target }}
-      - name: Install frontend dependencies
-        run: bun install --frozen-lockfile
-      - name: Check frontend
-        run: bun run check
-      - name: Test graph behavior
-        run: bun run test
+          shared-key: release-${{ matrix.target }}
+          cache-workspace-crates: true
+          cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/main' && !inputs.tag }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: frontend
+          path: dist
       - name: Test native Git inspection
-        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --target ${{ matrix.target }}
+        run: cargo test --release --locked --manifest-path src-tauri/Cargo.toml --target ${{ matrix.target }}
       - name: Build and attach platform installers
         uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # action-v1.0.0
         env:
@@ -118,25 +151,45 @@ jobs:
           releaseId: ${{ needs.prepare.outputs.release_id }}
           tagName: ${{ needs.prepare.outputs.tag }}
           releaseDraft: true
-          tauriScript: bun run tauri
-          args: --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
+          tauriScript: bunx --bun @tauri-apps/cli@${{ needs.prepare.outputs.tauri_cli }}
+          args: --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config .github/tauri-ci.json
           releaseAssetNamePattern: Gitler_[version]_${{ matrix.asset }}[ext]
+          uploadWorkflowArtifacts: ${{ !needs.prepare.outputs.release_id }}
+          workflowArtifactNamePattern: Gitler_[version]_${{ matrix.asset }}[ext]
           uploadUpdaterJson: false
           uploadUpdaterSignatures: false
 
   publish:
+    if: needs.prepare.outputs.release_id != ''
     name: Verify downloads and publish
     needs: [prepare, build]
+    timeout-minutes: 5
     runs-on: ubuntu-22.04
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ needs.prepare.outputs.tag }}
+          ref: ${{ needs.prepare.outputs.ref }}
       - name: Verify all platforms, attach checksums, and publish
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
         run: |
           python3 scripts/release.py publish "$RELEASE_TAG"
+
+  budget:
+    name: Check five-minute packaging budget
+    if: inputs.check_budget
+    needs: [prepare, build]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 2
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Check total elapsed time, including setup and uploads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/check_ci_budget.py "$(gh run view "$GITHUB_RUN_ID" --json createdAt --jq .createdAt)"

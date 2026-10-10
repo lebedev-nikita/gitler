@@ -82,3 +82,8 @@ Git inspection lives in `src-tauri/src/git.rs`; the React interface is in `src/`
 Version tags such as `v0.1.0` trigger the desktop release workflow. It tests and
 builds all six platform variants, attaches installers and SHA-256 checksums to a
 draft release, and publishes only after every platform succeeds.
+
+Pushes to `main` and pull requests test and package every platform without
+publishing. To measure the full build with a warmed cache, run
+`gh workflow run release.yml --ref main -f check_budget=true`; it fails if packaging
+takes more than five minutes. Leave `publish` disabled for manual build checks.
