@@ -276,7 +276,7 @@ export default function App() {
           </button>
           <div className="welcome-cli">
             <Terminal />
-            <code>gitler open /path/to/repository</code>
+            <code>gitler /path/to/repository</code>
           </div>
         </div>
       ) : !snapshot ? (

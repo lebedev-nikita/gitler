@@ -5,7 +5,7 @@ Gitler is a read-only desktop Git graph for repositories with many branches and 
 - Inspect staged, unstaged, and untracked files.
 - Select one node, right-click another, and choose **Diff with selected** to compare commits or current files.
 - Resolve any commit by hash, including commits outside the loaded history.
-- Open repositories from the GUI or with `gitler open /path/to/repository`.
+- Open repositories from the GUI or with `gitler /path/to/repository`.
 
 ## Downloads
 

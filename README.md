@@ -49,11 +49,11 @@ bun run tauri dev -- /path/to/any/worktree
 ```
 
 Build the desktop application with `bun run tauri build`. The compiled executable
-accepts `gitler open /path/to/repository` or `gitler /path/to/worktree`. Launching it
+accepts `gitler /path/to/repository` or `gitler /path/to/worktree`. Launching it
 again opens the requested repository in the existing window.
 
-For a local release build, run `src-tauri/target/release/gitler open .` from this
-project, or put that executable on your PATH to use `gitler open` from any folder.
+For a local release build, run `src-tauri/target/release/gitler .` from this
+project, or put that executable on your PATH to use `gitler` from any folder.
 
 `bun run dev` opens a browser preview with explicitly labeled demo data. Real local
 repositories are available only in the desktop application.

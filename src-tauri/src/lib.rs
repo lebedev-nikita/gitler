@@ -17,13 +17,13 @@ pub fn cli_path(args: &[String], cwd: &Path) -> Result<Option<String>, String> {
         values.next().map(String::as_str).unwrap_or(".")
     } else if first == "--help" || first == "-h" {
         return Err(
-            "Usage: gitler [open] [PATH]\nOpen any folder in a Git repository or worktree.".into(),
+            "Usage: gitler [PATH]\nOpen any folder in a Git repository or worktree.".into(),
         );
     } else {
         first.as_str()
     };
     if values.next().is_some() || path.starts_with('-') {
-        return Err("Usage: gitler [open] [PATH]".into());
+        return Err("Usage: gitler [PATH]".into());
     }
     let path = PathBuf::from(path);
     let resolved = if path.is_absolute() {
@@ -131,11 +131,7 @@ mod tests {
     #[test]
     fn resolves_cli_relative_to_invoking_terminal() {
         assert_eq!(
-            cli_path(
-                &["gitler".into(), "open".into(), "worktree".into()],
-                Path::new("/tmp")
-            )
-            .unwrap(),
+            cli_path(&["gitler".into(), "worktree".into()], Path::new("/tmp")).unwrap(),
             Some(
                 Path::new("/tmp")
                     .join("worktree")
