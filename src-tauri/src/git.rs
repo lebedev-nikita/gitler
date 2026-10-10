@@ -138,6 +138,212 @@ pub struct DiffResult {
     pub truncated: bool,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaVersion {
+    pub mime: String,
+    pub data_url: Option<String>,
+    pub size: Option<usize>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MediaResult {
+    pub before: Option<MediaVersion>,
+    pub after: Option<MediaVersion>,
+}
+
+fn media_mime(path: &str) -> Result<&'static str, String> {
+    let extension = Path::new(path)
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    match extension.as_str() {
+        "png" | "apng" => Ok("image/png"),
+        "jpg" | "jpeg" => Ok("image/jpeg"),
+        "gif" => Ok("image/gif"),
+        "webp" => Ok("image/webp"),
+        "avif" => Ok("image/avif"),
+        "svg" => Ok("image/svg+xml"),
+        "bmp" => Ok("image/bmp"),
+        "ico" => Ok("image/x-icon"),
+        "mp4" | "m4v" => Ok("video/mp4"),
+        "webm" => Ok("video/webm"),
+        "mov" => Ok("video/quicktime"),
+        "ogv" => Ok("video/ogg"),
+        "mp3" => Ok("audio/mpeg"),
+        "wav" => Ok("audio/wav"),
+        "ogg" | "oga" | "opus" => Ok("audio/ogg"),
+        "flac" => Ok("audio/flac"),
+        "aac" => Ok("audio/aac"),
+        "m4a" => Ok("audio/mp4"),
+        "aif" | "aiff" => Ok("audio/aiff"),
+        _ => Err("This file type has no media preview".into()),
+    }
+}
+
+fn media_version(path: &str, contents: Result<Option<Vec<u8>>, String>) -> Option<MediaVersion> {
+    use base64::Engine;
+    let mime = media_mime(path).unwrap_or("application/octet-stream");
+    match contents {
+        Ok(None) => None,
+        Ok(Some(bytes)) => Some(MediaVersion {
+            mime: mime.into(),
+            data_url: Some(format!(
+                "data:{mime};base64,{}",
+                base64::engine::general_purpose::STANDARD.encode(&bytes)
+            )),
+            size: Some(bytes.len()),
+            error: None,
+        }),
+        Err(error) => Some(MediaVersion {
+            mime: mime.into(),
+            data_url: None,
+            size: None,
+            error: Some(error),
+        }),
+    }
+}
+
+fn media_blob(common: &Path, mode: &str, oid: &str) -> Result<Option<Vec<u8>>, String> {
+    if !matches!(mode, "100644" | "100755") {
+        return Err("Media preview is unavailable for symbolic links and submodules".into());
+    }
+    let size = string(&in_repo(common, &["cat-file", "-s", oid])?)
+        .trim()
+        .parse::<usize>()
+        .map_err(|error| error.to_string())?;
+    if size > OUTPUT_LIMIT {
+        return Err("File exceeds the 16 MiB inspection limit".into());
+    }
+    in_repo(common, &["cat-file", "blob", oid]).map(Some)
+}
+
+fn historical_media(common: &Path, revision: &str, path: &str) -> Result<Option<Vec<u8>>, String> {
+    valid_oid(revision)?;
+    let raw = in_repo(common, &["ls-tree", "-z", revision, "--", path])?;
+    if raw.is_empty() {
+        return Ok(None);
+    }
+    let header = string(raw.split(|byte| *byte == b'\t').next().unwrap_or_default());
+    let fields: Vec<_> = header.split_whitespace().collect();
+    if fields.len() != 3 || fields[1] != "blob" {
+        return Err("This entry is not a regular file".into());
+    }
+    media_blob(common, fields[0], fields[2])
+}
+
+fn index_media(common: &Path, root: &Path, path: &str) -> Result<Option<Vec<u8>>, String> {
+    let raw = in_worktree(root, &["ls-files", "--stage", "-z", "--", path])?;
+    if raw.is_empty() {
+        return Ok(None);
+    }
+    let header = string(raw.split(|byte| *byte == b'\t').next().unwrap_or_default());
+    let fields: Vec<_> = header.split_whitespace().collect();
+    if fields.len() != 3 || fields[2] != "0" {
+        return Err("Resolve this file's merge conflict to preview the index".into());
+    }
+    media_blob(common, fields[0], fields[1])
+}
+
+fn working_media(root: &Path, path: &str) -> Result<Option<Vec<u8>>, String> {
+    let absolute = safe_mutation_path(root, path)?;
+    match std::fs::symlink_metadata(absolute) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            Err("Media preview is unavailable for symbolic links".into())
+        }
+        Ok(_) => read_working_file(root, path).map(Some),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+/// Read both sides of the same selection used by the patch inspector.
+pub fn file_media(request: &DiffRequest) -> Result<MediaResult, String> {
+    validate_file_path(&request.path)?;
+    media_mime(&request.path)?;
+    let old_path = request.old_path.as_deref().unwrap_or(&request.path);
+    validate_file_path(old_path)?;
+    if let Some(base) = request.base.as_deref() {
+        valid_oid(base)?;
+    }
+    let common = validate_common(&request.common_dir)?;
+    let (before, after) = if let Some(worktree) = request.worktree.as_deref() {
+        let trees = parse_worktrees(&in_repo(
+            &common,
+            &["worktree", "list", "--porcelain", "-z"],
+        )?);
+        let tree = trees
+            .iter()
+            .find(|tree| tree.path == worktree)
+            .ok_or("Worktree is not registered in this repository")?;
+        if resolve_common(worktree)? != common {
+            return Err("Worktree belongs to another repository".into());
+        }
+        let root = Path::new(worktree);
+        if !matches!(
+            request.mode.as_str(),
+            "combined" | "staged" | "unstaged" | "untracked"
+        ) {
+            return Err("Unknown diff mode".into());
+        }
+        if request.mode == "untracked" {
+            let status = parse_status(&in_worktree(
+                root,
+                &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+            )?);
+            if !status
+                .iter()
+                .any(|file| file.path == request.path && file.index_status == "?")
+            {
+                return Err("File is no longer untracked. Refresh to inspect it.".into());
+            }
+        }
+        let before = if let Some(base) = request.base.as_deref() {
+            historical_media(&common, base, old_path)
+        } else if request.mode == "unstaged" {
+            match index_media(&common, root, &request.path) {
+                Ok(None) => index_media(&common, root, old_path),
+                result => result,
+            }
+        } else if request.mode == "untracked" || tree.head.chars().all(|c| c == '0') {
+            Ok(None)
+        } else {
+            historical_media(&common, &tree.head, old_path)
+        };
+        let after = if request.mode == "staged" && request.base.is_none() {
+            index_media(&common, root, &request.path)
+        } else {
+            working_media(root, &request.path)
+        };
+        (before, after)
+    } else {
+        let oid = request.oid.as_deref().ok_or("Select a commit")?;
+        valid_oid(oid)?;
+        let parents = string(&in_repo(
+            &common,
+            &["show", "-s", "--format=%P", oid, "--"],
+        )?);
+        let base = request
+            .base
+            .as_deref()
+            .or_else(|| parents.split_whitespace().next());
+        (
+            base.map_or(Ok(None), |base| historical_media(&common, base, old_path)),
+            historical_media(&common, oid, &request.path),
+        )
+    };
+    let mut result = MediaResult {
+        before: media_version(old_path, before),
+        after: media_version(&request.path, after),
+    };
+    if request.reverse {
+        std::mem::swap(&mut result.before, &mut result.after);
+    }
+    Ok(result)
+}
+
 fn git_command() -> Command {
     let mut command = Command::new("git");
     command

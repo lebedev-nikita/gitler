@@ -117,6 +117,37 @@ describe.runIf(process.platform === "darwin" && process.arch === "arm64")(
       ).toBe(405);
     });
 
+    it("serves media bytes from a linked worktree through the browser transport", async () => {
+      const file = join(linked, "preview.svg");
+      const contents = '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>';
+      const index = await readFile(join(commonDir, "index"));
+      await writeFile(file, contents);
+      try {
+        const media = await call("file_media", {
+          request: {
+            commonDir,
+            worktree: linked,
+            oid: null,
+            base: null,
+            path: "preview.svg",
+            mode: "untracked",
+            reverse: false,
+          },
+        });
+        expect(media.before).toBeNull();
+        expect(media.after).toEqual({
+          mime: "image/svg+xml",
+          dataUrl: `data:image/svg+xml;base64,${Buffer.from(contents).toString("base64")}`,
+          size: Buffer.byteLength(contents),
+          error: null,
+        });
+        expect(await readFile(join(commonDir, "index"))).toEqual(index);
+        expect(await readFile(file, "utf8")).toBe(contents);
+      } finally {
+        await rm(file);
+      }
+    });
+
     it("preserves stale-preview checks before discarding selected files", async () => {
       const preview: DiscardPlan = await call("prepare_discard", {
         commonDir,

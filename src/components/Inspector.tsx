@@ -20,6 +20,7 @@ import { repositoryApi, makeDiffRequest } from "@/lib/repository";
 import { fileStatus, selectionId, worktreeCounts } from "@/lib/models";
 import type { Comparison, DiffMode, FileChange, Selection, Snapshot } from "@/lib/models";
 import { cn } from "@/lib/utils";
+import { mediaKind } from "@/lib/media";
 import {
   CopyButton,
   EmptyMessage,
@@ -30,6 +31,7 @@ import {
   shortPath,
 } from "./common";
 import { DiffView } from "./DiffView";
+import { MediaView } from "./MediaView";
 import { ResizableSplit } from "./ResizableSplit";
 
 const statusLabels: Record<string, string> = {
@@ -109,9 +111,10 @@ export function Inspector({
     [detail.data, tree, comparison, mode],
   );
   const selectedFile = files.find((file) => file.path === filePath) ?? files[0];
+  const isMedia = !!selectedFile && mediaKind(selectedFile.path) !== null;
   const diff = useQuery({
     queryKey: ["diff", ...detailKey, selectedFile?.path, mode],
-    enabled: !!selectedFile && previewOpen,
+    enabled: !!selectedFile && previewOpen && !isMedia,
     queryFn: () =>
       repositoryApi.diff(
         makeDiffRequest(snapshot.commonDir, selected, comparison, selectedFile!, mode),
@@ -122,6 +125,34 @@ export function Inspector({
         ? previousData
         : undefined,
   });
+  const media = useQuery({
+    queryKey: [
+      "media",
+      ...detailKey.slice(0, -1),
+      selectedFile?.path,
+      selectedFile?.oldPath,
+      mode,
+      snapshot.scannedAt,
+    ],
+    enabled: !!selectedFile && previewOpen && isMedia && !detail.isPlaceholderData,
+    queryFn: () =>
+      repositoryApi.media(
+        makeDiffRequest(snapshot.commonDir, selected, comparison, selectedFile!, mode),
+      ),
+    gcTime: 0,
+    placeholderData: (previousData, previousQuery) =>
+      JSON.stringify(previousQuery?.queryKey.slice(0, -1)) ===
+      JSON.stringify([
+        "media",
+        ...detailKey.slice(0, -1),
+        selectedFile?.path,
+        selectedFile?.oldPath,
+        mode,
+      ])
+        ? previousData
+        : undefined,
+  });
+  const preview = isMedia ? media : diff;
   const title = comparison
     ? "Compare changes"
     : tree
@@ -380,18 +411,20 @@ export function Inspector({
                             : "This commit has no file changes relative to its first parent."
                       }
                     />
-                  ) : diff.isPending ? (
-                    <Loading text="Reading diff…" />
-                  ) : diff.isError ? (
+                  ) : preview.isPending ? (
+                    <Loading text={isMedia ? "Reading media…" : "Reading diff…"} />
+                  ) : preview.isError ? (
                     <div className="py-[12px] px-[18px]">
                       <ErrorMessage
-                        title="Could not read diff"
-                        error={diff.error}
+                        title={isMedia ? "Could not read media" : "Could not read diff"}
+                        error={preview.error}
                         retry={() => {
-                          void diff.refetch();
+                          void preview.refetch();
                         }}
                       />
                     </div>
+                  ) : isMedia && media.data && selectedFile ? (
+                    <MediaView media={media.data} file={selectedFile.path} />
                   ) : diff.data && selectedFile ? (
                     <DiffView diff={diff.data} file={selectedFile.path} />
                   ) : null}

@@ -48,6 +48,9 @@ enum Command {
     FileDiff {
         request: git::DiffRequest,
     },
+    FileMedia {
+        request: git::DiffRequest,
+    },
     ResolveCommit {
         common_dir: String,
         revision: String,
@@ -128,6 +131,7 @@ fn dispatch(command: Command, jobs: &codex::Jobs) -> Result<Value, String> {
             base.as_deref(),
         )),
         Command::FileDiff { request } => value(git::file_diff(&request)),
+        Command::FileMedia { request } => value(git::file_media(&request)),
         Command::ResolveCommit {
             common_dir,
             revision,

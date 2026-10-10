@@ -117,6 +117,13 @@ async fn file_diff(request: git::DiffRequest) -> Result<git::DiffResult, String>
 }
 
 #[tauri::command]
+async fn file_media(request: git::DiffRequest) -> Result<git::MediaResult, String> {
+    tauri::async_runtime::spawn_blocking(move || git::file_media(&request))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 async fn worktree_detail(
     common_dir: String,
     worktree: String,
@@ -287,6 +294,7 @@ pub fn run() {
             worktree_detail,
             resolve_commit,
             file_diff,
+            file_media,
             generate_branch_name,
             cancel_codegen,
             rename_branch,

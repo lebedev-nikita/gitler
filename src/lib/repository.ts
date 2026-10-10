@@ -8,6 +8,7 @@ import {
   DiscardPlanSchema,
   DetailSchema,
   DiffSchema,
+  MediaSchema,
   SnapshotSchema,
 } from "./models";
 import type {
@@ -18,6 +19,7 @@ import type {
   DiffRequest,
   DiffResult,
   FileChange,
+  MediaResult,
   Selection,
   Snapshot,
 } from "./models";
@@ -145,6 +147,14 @@ const loadDiff = Effect.fn("loadDiff")(function* (request: DiffRequest) {
   );
 });
 
+const loadMedia = Effect.fn("loadMedia")(function* (request: DiffRequest) {
+  const transport = yield* GitTransport;
+  const payload = yield* transport.call("file_media", { request });
+  return yield* Schema.decodeUnknownEffect(MediaSchema)(payload).pipe(
+    Effect.mapError((error) => new RepositoryError({ message: error.message })),
+  );
+});
+
 const action = Effect.fn("repositoryAction")(function* <A, I>(
   commonDir: string,
   command: string,
@@ -226,6 +236,7 @@ export const repositoryApi = {
   detail: (common: string, selection: Selection, comparison: Comparison | null): Promise<Detail> =>
     runtime.runPromise(loadDetail(common, selection, comparison)),
   diff: (request: DiffRequest): Promise<DiffResult> => runtime.runPromise(loadDiff(request)),
+  media: (request: DiffRequest): Promise<MediaResult> => runtime.runPromise(loadMedia(request)),
   resolveCommit: (commonDir: string, revision: string): Promise<string> => {
     if (isDemo(commonDir)) {
       const commit = demoSnapshot().commits.find((commit) => commit.oid.startsWith(revision));

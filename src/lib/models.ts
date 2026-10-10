@@ -95,6 +95,19 @@ export type Detail = typeof DetailSchema.Type;
 export const DiffSchema = Schema.Struct({ text: Schema.String, truncated: Schema.Boolean });
 export type DiffResult = typeof DiffSchema.Type;
 
+export const MediaVersionSchema = Schema.Struct({
+  mime: Schema.String,
+  dataUrl: Schema.NullOr(Schema.String),
+  size: Schema.NullOr(Schema.Number),
+  error: Schema.NullOr(Schema.String),
+});
+export type MediaVersion = typeof MediaVersionSchema.Type;
+export const MediaSchema = Schema.Struct({
+  before: Schema.NullOr(MediaVersionSchema),
+  after: Schema.NullOr(MediaVersionSchema),
+});
+export type MediaResult = typeof MediaSchema.Type;
+
 export type Selection = { kind: "commit"; oid: string } | { kind: "worktree"; path: string };
 export type Comparison = { from: Selection; to: Selection };
 export type DiffMode = "combined" | "staged" | "unstaged";
