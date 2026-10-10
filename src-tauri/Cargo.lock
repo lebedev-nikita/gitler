@@ -1283,7 +1283,6 @@ dependencies = [
 name = "gitler"
 version = "0.2.4"
 dependencies = [
- "dunce",
  "libc",
  "serde",
  "serde_json",
@@ -1294,7 +1293,6 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tempfile",
  "wait-timeout",
- "windows-sys 0.61.2",
 ]
 
 [[package]]

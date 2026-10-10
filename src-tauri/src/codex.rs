@@ -58,15 +58,10 @@ fn executable(override_path: Option<&str>) -> PathBuf {
     if let Some(path) = override_path.filter(|path| !path.trim().is_empty()) {
         return PathBuf::from(path);
     }
-    let filenames: &[&str] = if cfg!(windows) {
-        &["codex.exe", "codex.cmd"]
-    } else {
-        &["codex"]
-    };
     let mut directories: Vec<PathBuf> = std::env::var_os("PATH")
         .map(|path| std::env::split_paths(&path).collect())
         .unwrap_or_default();
-    if let Some(home) = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")) {
+    if let Some(home) = std::env::var_os("HOME") {
         let home = PathBuf::from(home);
         directories.extend([
             home.join(".local/bin"),
@@ -78,18 +73,11 @@ fn executable(override_path: Option<&str>) -> PathBuf {
         PathBuf::from("/opt/homebrew/bin"),
         PathBuf::from("/usr/local/bin"),
     ]);
-    if let Some(appdata) = std::env::var_os("APPDATA") {
-        directories.push(PathBuf::from(appdata).join("npm"));
-    }
     directories
         .into_iter()
-        .flat_map(|directory| {
-            filenames
-                .iter()
-                .map(move |filename| directory.join(filename))
-        })
+        .map(|directory| directory.join("codex"))
         .find(|path| path.is_file())
-        .unwrap_or_else(|| filenames[0].into())
+        .unwrap_or_else(|| "codex".into())
 }
 
 fn drain(mut reader: impl Read) -> Vec<u8> {
@@ -203,11 +191,6 @@ fn run(
     {
         use std::os::unix::process::CommandExt;
         command.process_group(0);
-    }
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000);
     }
     let mut child = command.spawn().map_err(|error| format!("Could not start Codex. Install Codex CLI, run `codex login`, or set its executable path. {error}"))?;
     let mut stdin = child.stdin.take().ok_or("Codex input unavailable")?;

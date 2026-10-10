@@ -11,7 +11,7 @@ on:
         description: Existing version tag (leave empty to build the selected ref)
         required: false
       publish:
-        description: Publish the tagged release after all platforms succeed
+        description: Publish the tagged macOS Apple Silicon release
         type: boolean
         default: false
       check_budget:
@@ -25,6 +25,7 @@ permissions:
 env:
   CARGO_INCREMENTAL: "0"
   RUSTUP_TOOLCHAIN: "1.99.0"
+  NATIVE_TARGET: aarch64-apple-darwin
 
 concurrency:
   group: desktop-${{ (startsWith(github.ref, 'refs/tags/') || inputs.publish) && 'release' || 'check' }}-${{ inputs.tag || github.head_ref || github.ref_name }}
@@ -39,7 +40,6 @@ jobs:
     outputs:
       ref: ${{ inputs.tag || github.sha }}
       tauri_cli: ${{ steps.cli.outputs.version }}
-      apt_cache_day: ${{ steps.cli.outputs.apt_cache_day }}
       release_id: ${{ steps.release.outputs.id }}
       tag: ${{ steps.release.outputs.tag }}
     steps:
@@ -56,13 +56,12 @@ jobs:
           bun run check
           bun run test
           python3 -m unittest discover -s scripts -p 'test_*.py'
-      - name: Build frontend once for every platform
+      - name: Build frontend
         run: bun run build
       - name: Resolve the locked Tauri CLI version
         id: cli
         run: |
           bun -e 'console.log("version=" + require("./node_modules/@tauri-apps/cli/package.json").version)' >> "$GITHUB_OUTPUT"
-          echo "apt_cache_day=$(date -u +%F)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: frontend
@@ -79,60 +78,18 @@ jobs:
           python3 scripts/release.py prepare "$RELEASE_TAG"
 
   build:
-    name: ${{ matrix.name }}
+    name: macOS Apple Silicon
     needs: prepare
-    runs-on: ${{ matrix.runner }}
+    runs-on: macos-15
     timeout-minutes: 15
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: macOS Apple Silicon
-            runner: macos-15
-            target: aarch64-apple-darwin
-            asset: macos-arm64
-            bundles: app,dmg
-          - name: macOS Intel
-            runner: macos-15-intel
-            target: x86_64-apple-darwin
-            asset: macos-x64
-            bundles: app,dmg
-          - name: Windows x64
-            runner: windows-2022
-            target: x86_64-pc-windows-msvc
-            asset: windows-x64
-            bundles: nsis,msi
-          - name: Windows ARM64
-            runner: windows-11-arm
-            target: aarch64-pc-windows-msvc
-            asset: windows-arm64
-            bundles: nsis
-          - name: Linux x64
-            runner: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            asset: linux-x64
-            bundles: appimage,deb,rpm
-          - name: Linux ARM64
-            runner: ubuntu-22.04-arm
-            target: aarch64-unknown-linux-gnu
-            asset: linux-arm64
-            bundles: appimage,deb,rpm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.prepare.outputs.ref }}
-      - name: Restore Linux package downloads
-        if: runner.os == 'Linux'
-        id: system-cache
-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          key: native-apt-v1-${{ matrix.target }}-${{ needs.prepare.outputs.apt_cache_day }}
-          restore-keys: native-apt-v1-${{ matrix.target }}-
-          path: ${{ runner.temp }}/gitler-apt-archives/*.deb
       - name: Start native prerequisite setup
-        run: ${{ runner.os == 'Windows' && 'python' || 'python3' }} scripts/native_ci_setup.py start ${{ matrix.target }}
+        run: python3 scripts/native_ci_setup.py start ${{ env.NATIVE_TARGET }}
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.4.2
@@ -142,89 +99,77 @@ jobs:
           path: dist
       - name: Hash the native sources and built frontend
         id: native-source
-        run: ${{ runner.os == 'Windows' && 'python' || 'python3' }} scripts/native_ci_cache.py key
+        run: python3 scripts/native_ci_cache.py key
       # Keep registry sources and build outputs together. Removing sources makes
       # objc2's native build helpers invalidate the cached macOS dependency graph.
       - name: Restore native release cache
         id: native-cache
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
-          key: native-source-v2-${{ runner.os }}-${{ matrix.target }}-1.99.0-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-${{ steps.native-source.outputs.key }}
+          key: native-source-v2-${{ runner.os }}-${{ env.NATIVE_TARGET }}-1.99.0-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-${{ steps.native-source.outputs.key }}
           restore-keys: |
-            native-source-v2-${{ runner.os }}-${{ matrix.target }}-1.99.0-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-
-            native-source-v2-${{ runner.os }}-${{ matrix.target }}-1.99.0-
-            native-source-v1-${{ runner.os }}-${{ matrix.target }}-1.99.0-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-${{ steps.native-source.outputs.key }}
-            native-source-v1-${{ runner.os }}-${{ matrix.target }}-1.99.0-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-
-            native-source-v1-${{ runner.os }}-${{ matrix.target }}-1.99.0-
-            native-release-${{ runner.os == 'Windows' && 'v2' || 'v1' }}-${{ runner.os }}-${{ matrix.target }}-1.99.0-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}
-            native-release-${{ runner.os == 'Windows' && 'v2' || 'v1' }}-${{ runner.os }}-${{ matrix.target }}-1.99.0-
+            native-source-v2-${{ runner.os }}-${{ env.NATIVE_TARGET }}-1.99.0-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-
+            native-source-v2-${{ runner.os }}-${{ env.NATIVE_TARGET }}-1.99.0-
+            native-source-v1-${{ runner.os }}-${{ env.NATIVE_TARGET }}-1.99.0-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-${{ steps.native-source.outputs.key }}
+            native-source-v1-${{ runner.os }}-${{ env.NATIVE_TARGET }}-1.99.0-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-
+            native-source-v1-${{ runner.os }}-${{ env.NATIVE_TARGET }}-1.99.0-
+            native-release-v1-${{ runner.os }}-${{ env.NATIVE_TARGET }}-1.99.0-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}
+            native-release-v1-${{ runner.os }}-${{ env.NATIVE_TARGET }}-1.99.0-
           path: |
-            ${{ runner.os == 'Windows' && '~/.cargo/registry/cache' || '~/.cargo/registry' }}
-            ${{ runner.os == 'Windows' && '~/.cargo/registry/index' || '' }}
-            ${{ runner.os == 'Windows' && '~/.cargo/registry/src/*/*-sys-*' || '' }}
+            ~/.cargo/registry
             ~/.cargo/git
             src-tauri/target/release
-            src-tauri/target/${{ matrix.target }}/release/build
-            src-tauri/target/${{ matrix.target }}/release/deps
-            src-tauri/target/${{ matrix.target }}/release/.fingerprint
+            src-tauri/target/${{ env.NATIVE_TARGET }}/release/build
+            src-tauri/target/${{ env.NATIVE_TARGET }}/release/deps
+            src-tauri/target/${{ env.NATIVE_TARGET }}/release/.fingerprint
       - name: Wait for native prerequisites before compiling
-        run: ${{ runner.os == 'Windows' && 'python' || 'python3' }} scripts/native_ci_setup.py wait
+        run: python3 scripts/native_ci_setup.py wait
       - name: Bootstrap from the previous dependency cache
         if: steps.native-cache.outputs.cache-matched-key == ''
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           workspaces: src-tauri -> target
-          shared-key: release-${{ matrix.target }}
+          shared-key: release-${{ env.NATIVE_TARGET }}
           cache-workspace-crates: true
           save-if: false
       - name: Prepare content-checked native cache
-        run: ${{ runner.os == 'Windows' && 'python' || 'python3' }} scripts/native_ci_cache.py prepare
+        run: python3 scripts/native_ci_cache.py prepare
       - name: Test native Git inspection
         env:
           # Match Tauri's default so native macOS helpers are reused by the build.
           MACOSX_DEPLOYMENT_TARGET: "10.13"
           TAURI_CONFIG: '{"build":{"beforeBuildCommand":""}}'
-        run: cargo test --release --locked --manifest-path src-tauri/Cargo.toml --target ${{ matrix.target }} --config 'profile.release.package.gitler.opt-level=0'
-      - name: Build and attach platform installers
+        run: cargo test --release --locked --manifest-path src-tauri/Cargo.toml --target ${{ env.NATIVE_TARGET }} --config 'profile.release.package.gitler.opt-level=0'
+      - name: Build and attach macOS Apple Silicon downloads
         uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # action-v1.0.0
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          NO_STRIP: "true"
-          APPIMAGE_EXTRACT_AND_RUN: "1"
         with:
           releaseId: ${{ needs.prepare.outputs.release_id }}
           tagName: ${{ needs.prepare.outputs.tag }}
           releaseDraft: true
           tauriScript: bunx --bun @tauri-apps/cli@${{ needs.prepare.outputs.tauri_cli }}
-          args: --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config '{"build":{"beforeBuildCommand":""}}'
-          releaseAssetNamePattern: Gitler_[version]_${{ matrix.asset }}[ext]
+          args: --target ${{ env.NATIVE_TARGET }} --bundles app,dmg --config '{"build":{"beforeBuildCommand":""}}'
+          releaseAssetNamePattern: Gitler_[version]_macos-arm64[ext]
           uploadWorkflowArtifacts: ${{ !needs.prepare.outputs.release_id }}
-          workflowArtifactNamePattern: Gitler_[version]_${{ matrix.asset }}[ext]
+          workflowArtifactNamePattern: Gitler_[version]_macos-arm64[ext]
           uploadUpdaterJson: false
           uploadUpdaterSignatures: false
-      - name: Save Linux package downloads
-        if: success() && runner.os == 'Linux' && github.ref == 'refs/heads/main' && !inputs.tag && steps.system-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          key: ${{ steps.system-cache.outputs.cache-primary-key }}
-          path: ${{ runner.temp }}/gitler-apt-archives/*.deb
       - name: Trim obsolete native outputs before caching
         if: success() && steps.native-cache.outputs.cache-hit != 'true'
-        run: ${{ runner.os == 'Windows' && 'python' || 'python3' }} scripts/trim_native_ci_cache.py
+        run: python3 scripts/trim_native_ci_cache.py
       - name: Save native release cache
         if: success() && github.ref == 'refs/heads/main' && !inputs.tag && steps.native-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           key: ${{ steps.native-cache.outputs.cache-primary-key }}
           path: |
-            ${{ runner.os == 'Windows' && '~/.cargo/registry/cache' || '~/.cargo/registry' }}
-            ${{ runner.os == 'Windows' && '~/.cargo/registry/index' || '' }}
-            ${{ runner.os == 'Windows' && '~/.cargo/registry/src/*/*-sys-*' || '' }}
+            ~/.cargo/registry
             ~/.cargo/git
             src-tauri/target/release
-            src-tauri/target/${{ matrix.target }}/release/build
-            src-tauri/target/${{ matrix.target }}/release/deps
-            src-tauri/target/${{ matrix.target }}/release/.fingerprint
+            src-tauri/target/${{ env.NATIVE_TARGET }}/release/build
+            src-tauri/target/${{ env.NATIVE_TARGET }}/release/deps
+            src-tauri/target/${{ env.NATIVE_TARGET }}/release/.fingerprint
 
   publish:
     if: needs.prepare.outputs.release_id != ''
@@ -245,7 +190,7 @@ jobs:
           ref: main
           path: homebrew-tap
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-      - name: Verify all platforms, attach checksums, and publish
+      - name: Verify Apple Silicon downloads, attach checksums, and publish
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
