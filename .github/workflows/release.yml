@@ -39,6 +39,7 @@ jobs:
     outputs:
       ref: ${{ inputs.tag || github.sha }}
       tauri_cli: ${{ steps.cli.outputs.version }}
+      apt_cache_day: ${{ steps.cli.outputs.apt_cache_day }}
       release_id: ${{ steps.release.outputs.id }}
       tag: ${{ steps.release.outputs.tag }}
     steps:
@@ -59,7 +60,9 @@ jobs:
         run: bun run build
       - name: Resolve the locked Tauri CLI version
         id: cli
-        run: bun -e 'console.log("version=" + require("./node_modules/@tauri-apps/cli/package.json").version)' >> "$GITHUB_OUTPUT"
+        run: |
+          bun -e 'console.log("version=" + require("./node_modules/@tauri-apps/cli/package.json").version)' >> "$GITHUB_OUTPUT"
+          echo "apt_cache_day=$(date -u +%F)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: frontend
@@ -120,6 +123,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.prepare.outputs.ref }}
+      - name: Restore Linux package downloads
+        if: runner.os == 'Linux'
+        id: system-cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          key: native-apt-v1-${{ matrix.target }}-${{ needs.prepare.outputs.apt_cache_day }}
+          restore-keys: native-apt-v1-${{ matrix.target }}-
+          path: ${{ runner.temp }}/gitler-apt-archives/*.deb
       - name: Start native prerequisite setup
         run: ${{ runner.os == 'Windows' && 'python' || 'python3' }} scripts/native_ci_setup.py start ${{ matrix.target }}
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -138,8 +149,11 @@ jobs:
         id: native-cache
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
-          key: native-source-v1-${{ runner.os }}-${{ matrix.target }}-1.99.0-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-${{ steps.native-source.outputs.key }}
+          key: native-source-v2-${{ runner.os }}-${{ matrix.target }}-1.99.0-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-${{ steps.native-source.outputs.key }}
           restore-keys: |
+            native-source-v2-${{ runner.os }}-${{ matrix.target }}-1.99.0-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-
+            native-source-v2-${{ runner.os }}-${{ matrix.target }}-1.99.0-
+            native-source-v1-${{ runner.os }}-${{ matrix.target }}-1.99.0-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-${{ steps.native-source.outputs.key }}
             native-source-v1-${{ runner.os }}-${{ matrix.target }}-1.99.0-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-
             native-source-v1-${{ runner.os }}-${{ matrix.target }}-1.99.0-
             native-release-${{ runner.os == 'Windows' && 'v2' || 'v1' }}-${{ runner.os }}-${{ matrix.target }}-1.99.0-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}
@@ -188,6 +202,15 @@ jobs:
           workflowArtifactNamePattern: Gitler_[version]_${{ matrix.asset }}[ext]
           uploadUpdaterJson: false
           uploadUpdaterSignatures: false
+      - name: Save Linux package downloads
+        if: success() && runner.os == 'Linux' && github.ref == 'refs/heads/main' && !inputs.tag && steps.system-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          key: ${{ steps.system-cache.outputs.cache-primary-key }}
+          path: ${{ runner.temp }}/gitler-apt-archives/*.deb
+      - name: Trim obsolete native outputs before caching
+        if: success() && steps.native-cache.outputs.cache-hit != 'true'
+        run: ${{ runner.os == 'Windows' && 'python' || 'python3' }} scripts/trim_native_ci_cache.py
       - name: Save native release cache
         if: success() && github.ref == 'refs/heads/main' && !inputs.tag && steps.native-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4

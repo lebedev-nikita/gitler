@@ -50,9 +50,12 @@ def worker(name, arguments):
                 "--no-self-update", "--target", arguments[0],
             ]]
         elif name == "linux":
+            archives = Path(os.environ["RUNNER_TEMP"]) / "gitler-apt-archives"
+            archives.mkdir(parents=True, exist_ok=True)
             commands = [
                 ["sudo", "apt-get", "update"],
-                ["sudo", "apt-get", "install", "-y", "--no-install-recommends",
+                ["sudo", "apt-get", "-o", f"Dir::Cache::archives={archives}",
+                 "-o", "APT::Keep-Downloaded-Packages=true", "install", "-y", "--no-install-recommends",
                  "libwebkit2gtk-4.1-dev", "build-essential", "libssl-dev", "libgtk-3-dev",
                  "libayatana-appindicator3-dev", "librsvg2-dev", "patchelf", "libfuse2", "rpm"],
             ]
