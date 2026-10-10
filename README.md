@@ -29,7 +29,18 @@ functional reference; this is not a complete replacement for all of its actions.
 
 ## Download
 
-Download installers from [GitHub Releases](https://github.com/lebedev-nikita/gitler/releases/latest).
+Install on macOS (Intel or Apple Silicon) with Homebrew:
+
+```sh
+brew install --cask jeff-business/tap/gitler
+gitler /path/to/repository
+```
+
+The [Homebrew tap](https://github.com/jeff-business/homebrew-tap) installs the app,
+the `gitler` command, and Git. It tracks the newest published version, including
+release candidates. Upgrade with `brew update && brew upgrade --cask gitler`.
+
+Download other installers from [GitHub Releases](https://github.com/jeff-business/gitler/releases/latest).
 macOS (Intel and Apple Silicon), Windows (x64 and ARM64), and Linux (x64 and ARM64)
 are supported. Git must be installed and available on PATH. The initial releases
 use ad-hoc signing on macOS and no commercial signing certificate on Windows.
