@@ -8,7 +8,8 @@ edition = "2021"
 
 [lib]
 name = "gitler_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+# Desktop executables need only an rlib; shared outputs collide across profiles.
+crate-type = ["rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

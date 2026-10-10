@@ -96,5 +96,5 @@ draft release, and publishes only after every platform succeeds.
 Pushes to `main` and pull requests test and package every platform without
 publishing. To measure the full build with a warmed cache, run
 `gh workflow run release.yml --ref main -f check_budget=true`; it fails if packaging
-takes more than five minutes. Releases check this limit automatically, including
+takes more than three minutes. Releases check this limit automatically, including
 publication. Leave `publish` disabled for manual build checks.

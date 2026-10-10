@@ -1,7 +1,8 @@
 use gitler_lib::git::{self, DiffRequest};
 use std::fs;
+use std::io::Write;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use tempfile::TempDir;
 
 fn git(path: &Path, args: &[&str]) -> String {
@@ -257,9 +258,30 @@ fn hides_checkpoints_without_losing_history_or_detached_worktrees() {
         let reference = format!("refs/t3/checkpoints/test-thread/turn/{turn}");
         let message = format!("t3 checkpoint ref={reference}");
         let oid = git(repo.path(), &["commit-tree", &tree, "-m", &message]);
-        git(repo.path(), &["update-ref", &reference, &oid]);
         checkpoints.push((reference, oid));
     }
+    let mut update = Command::new("git")
+        .arg("-C")
+        .arg(repo.path())
+        .args(["update-ref", "--stdin"])
+        .stdin(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut input = update.stdin.take().unwrap();
+    for (reference, oid) in &checkpoints {
+        writeln!(input, "create {reference} {oid}").unwrap();
+    }
+    drop(input);
+    assert!(update.wait().unwrap().success());
+    let checkpoint_refs = git(
+        repo.path(),
+        &[
+            "for-each-ref",
+            "--format=%(refname) %(objectname)",
+            "refs/t3/checkpoints/",
+        ],
+    );
+    assert_eq!(checkpoint_refs.lines().count(), checkpoints.len());
 
     let holder = TempDir::new().unwrap();
     let worktree = holder.path().join("detached");
@@ -290,7 +312,10 @@ fn hides_checkpoints_without_losing_history_or_detached_worktrees() {
             git::resolve_commit(&snapshot.common_dir, &first[..7]).unwrap(),
             first
         );
-        for (_, oid) in &checkpoints {
+        // Cover both sides of the history limit and the final checkpoint;
+        // the snapshot above verifies that all 55 checkpoints are excluded.
+        for turn in [0, 49, 54] {
+            let (_, oid) = &checkpoints[turn];
             assert!(git::resolve_commit(&snapshot.common_dir, oid).is_err());
             assert!(git::resolve_commit(&snapshot.common_dir, &oid[..7]).is_err());
         }
@@ -298,9 +323,17 @@ fn hides_checkpoints_without_losing_history_or_detached_worktrees() {
 
     assert_eq!(fs::read(repo.path().join(".git/index")).unwrap(), index);
     assert_eq!(git(repo.path(), &["rev-parse", "HEAD"]), first);
-    for (reference, oid) in checkpoints {
-        assert_eq!(git(repo.path(), &["rev-parse", &reference]), oid);
-    }
+    assert_eq!(
+        git(
+            repo.path(),
+            &[
+                "for-each-ref",
+                "--format=%(refname) %(objectname)",
+                "refs/t3/checkpoints/"
+            ],
+        ),
+        checkpoint_refs
+    );
 }
 
 #[test]
