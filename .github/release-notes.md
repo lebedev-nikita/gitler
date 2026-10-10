@@ -1,10 +1,12 @@
-Gitler 0.2.2 keeps automatic repository refreshes quiet and preserves the loaded diff.
+Gitler 0.2.4 adds resizable panels and controls for hiding details and the diff preview.
 
 ## Changes
 
-- Automatic scans no longer animate the refresh button, show a refreshing message, or put history controls into a loading state.
-- Keep the loaded file list and diff visible while rechecking them in the background. Updated file contents still appear even when Git statuses have not changed.
-- Manual refreshes from the toolbar or keyboard shortcut continue to show progress. Switching files or diff modes retains the appropriate loading state, and refresh errors remain visible.
+- Resize the graph and details panels by dragging their boundary. Resize the changed-file list and diff preview independently.
+- Hide or reopen the details panel from the toolbar, and toggle the diff preview beside the changed-file heading.
+- Panel sizes and visibility are remembered. Hiding details preserves the selected file and changes view; selecting another graph node respects hidden panels.
+- Remove the auto-refresh toggle from the status bar. Background refresh continues every 15 seconds without showing a loading spinner.
+- Publish the updated Homebrew cask automatically after the release downloads are verified.
 
 ## Downloads
 

@@ -174,7 +174,10 @@ export function GraphActions({
         if (!open && !busy) close();
       }}
     >
-      <DialogContent className="graph-action-dialog" showCloseButton={!busy}>
+      <DialogContent
+        className="max-h-[calc(100dvh_-_32px)] overflow-y-auto"
+        showCloseButton={!busy}
+      >
         <DialogHeader>
           <DialogTitle>
             {action.kind === "rename" ? "Rename branch with Codex" : "Discard uncommitted changes"}
@@ -185,9 +188,13 @@ export function GraphActions({
               : "Restore selected files to HEAD, including staged and unstaged edits. Selected untracked and newly added files will be deleted permanently."}
           </DialogDescription>
         </DialogHeader>
-        <div className="action-target">
+        <div className="flex flex-col gap-[4px] min-w-0 wrap-anywhere">
           <strong>{label}</strong>
-          {action.worktree && <span title={action.worktree}>{shortPath(action.worktree)}</span>}
+          {action.worktree && (
+            <span className="text-muted-foreground text-[11px]" title={action.worktree}>
+              {shortPath(action.worktree)}
+            </span>
+          )}
         </div>
         {demo && (
           <Alert>
@@ -214,8 +221,10 @@ export function GraphActions({
                 Only the local branch is renamed. Its upstream remains configured.
               </FieldDescription>
             </Field>
-            <details className="codex-options">
-              <summary>Codex executable</summary>
+            <details>
+              <summary className="cursor-pointer text-muted-foreground mb-[12px]">
+                Codex executable
+              </summary>
               <Field>
                 <FieldLabel htmlFor="codex-path">Executable path (optional)</FieldLabel>
                 <Input
@@ -234,12 +243,12 @@ export function GraphActions({
             </details>
           </FieldGroup>
         ) : loading ? (
-          <p className="action-progress" role="status">
-            <LoaderCircle className="animate-spin" /> Reading changed files…
+          <p className="flex items-center gap-[8px] text-muted-foreground" role="status">
+            <LoaderCircle className="animate-spin size-[16px]" /> Reading changed files…
           </p>
         ) : (
           plan && (
-            <FieldSet className="discard-files">
+            <FieldSet className="min-w-0 gap-[12px]">
               <FieldLegend variant="label">Files to discard · {selected.size} selected</FieldLegend>
               <Field orientation="horizontal">
                 <Checkbox
@@ -261,7 +270,7 @@ export function GraphActions({
                 />
                 <FieldLabel htmlFor="discard-all">Select all available files</FieldLabel>
               </Field>
-              <FieldGroup className="discard-file-list">
+              <FieldGroup className="max-h-[280px] overflow-y-auto p-[4px] gap-[16px]">
                 {plan.files.map((file, index) => (
                   <Field
                     key={file.path}
@@ -282,7 +291,7 @@ export function GraphActions({
                       }
                     />
                     <FieldContent>
-                      <FieldLabel htmlFor={`discard-file-${index}`} className="discard-file-path">
+                      <FieldLabel htmlFor={`discard-file-${index}`} className="wrap-anywhere">
                         {file.oldPath ? `${file.oldPath} → ${file.path}` : file.path}
                       </FieldLabel>
                       <FieldDescription>
@@ -313,8 +322,8 @@ export function GraphActions({
           </Alert>
         )}
         {loading && action.kind === "rename" && (
-          <p className="action-progress" role="status">
-            <LoaderCircle className="animate-spin" /> Generating a branch name…
+          <p className="flex items-center gap-[8px] text-muted-foreground" role="status">
+            <LoaderCircle className="animate-spin size-[16px]" /> Generating a branch name…
           </p>
         )}
         <DialogFooter>

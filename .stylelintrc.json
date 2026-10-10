@@ -1,0 +1,12 @@
+{
+  "rules": {
+    "selector-max-class": [
+      0,
+      {
+        "message": "Keep component styling in Tailwind classes in JSX; CSS is reserved for theme tokens and global base styles."
+      }
+    ],
+    "selector-max-id": 0,
+    "at-rule-disallowed-list": ["utility"]
+  }
+}

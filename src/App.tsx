@@ -43,6 +43,7 @@ import { DEMO_PATH } from "@/lib/demo";
 import { desktop, isDemo, repositoryApi } from "@/lib/repository";
 import { selectionId } from "@/lib/models";
 import type { Commit, Comparison, GraphAction, Selection } from "@/lib/models";
+import { cn } from "@/lib/utils";
 import { mergeCommitHistory } from "@/lib/graph";
 
 const initialInspectorView: InspectorView = { filePath: null, mode: "combined", metadata: false };
@@ -236,13 +237,13 @@ export default function App() {
   };
 
   return (
-    <main className="app-shell">
-      <header className="app-toolbar">
-        <div className="brand-mark">
-          <GitFork />
+    <main className="h-dvh flex flex-col overflow-hidden">
+      <header className="flex-none flex items-center gap-[10px] h-[54px] py-0 px-[18px] bg-card border-b border-border compact:py-0 compact:px-[10px] compact:gap-[5px]">
+        <div className="grid place-items-center size-[28px] text-primary">
+          <GitFork className="size-[23px] [stroke-width:1.7]" />
         </div>
-        <strong className="app-name">Gitler</strong>
-        <span className="toolbar-divider" />
+        <strong className="text-[16px] font-[650] tracking-[-0.025em]">Gitler</strong>
+        <span className="h-[17px] w-[1px] my-0 mx-[3px] bg-border" />
         <Button
           variant="ghost"
           size="sm"
@@ -253,8 +254,12 @@ export default function App() {
           {snapshot?.name ?? "No repository"}
           <ChevronRight data-icon="inline-end" />
         </Button>
-        {demo && <Badge variant="outline">Demo</Badge>}
-        <div className="toolbar-spacer" />
+        {demo && (
+          <Badge className="compact:hidden" variant="outline">
+            Demo
+          </Badge>
+        )}
+        <div className="flex-1" />
         <Button
           variant="outline"
           size="sm"
@@ -277,7 +282,7 @@ export default function App() {
             void refreshRepository();
           }}
         >
-          <RefreshCw className={refreshBusy ? "spin" : undefined} />
+          <RefreshCw className={refreshBusy ? "animate-spin" : undefined} />
         </Button>
         <Button
           variant="ghost"
@@ -301,12 +306,14 @@ export default function App() {
         </Button>
       </header>
       {!path ? (
-        <div className="welcome">
-          <div className="welcome-graph">
-            <GitFork />
+        <div className="flex-1 flex flex-col items-center justify-center gap-[24px] py-[40px] px-[24px]">
+          <div className="size-[64px] grid place-items-center text-primary bg-card border border-border rounded-[12px]">
+            <GitFork className="size-[34px] [stroke-width:1.3]" />
           </div>
-          <h1>Every branch. Nothing left behind.</h1>
-          <p>
+          <h1 className="text-[28px] font-[550] tracking-[-0.03em] mt-[8px] mx-0 mb-[-12px] text-center compact:text-[24px]">
+            Every branch. Nothing left behind.
+          </h1>
+          <p className="text-muted-foreground text-[14px] leading-[1.8] max-w-[475px] text-center m-0">
             See your repository's history and find uncommitted work across every branch, without
             switching your working copy.
           </p>
@@ -315,21 +322,21 @@ export default function App() {
             Open a repository
           </Button>
           <button
-            className="demo-link"
+            className="flex items-center gap-[4px] text-muted-foreground text-[12px] mt-[-9px] hover:text-primary"
             onClick={() => {
               void openRepository(DEMO_PATH);
             }}
           >
             Explore the demo repository
-            <ChevronRight />
+            <ChevronRight className="size-[13px]" />
           </button>
-          <div className="welcome-cli">
-            <Terminal />
+          <div className="flex items-center gap-[9px] py-[14px] px-[20px] mt-[12px] border-t border-border text-muted-foreground text-[11px]">
+            <Terminal className="size-[14px]" />
             <code>gitler /path/to/repository</code>
           </div>
         </div>
       ) : !snapshot ? (
-        <div className="repository-loading">
+        <div className="flex-1 grid place-items-center p-[30px] [&>_[data-slot='alert']]:max-w-[560px]">
           {repository.isError ? (
             <ErrorMessage
               title="Could not open repository"
@@ -344,43 +351,48 @@ export default function App() {
         </div>
       ) : (
         <>
-          <div className="repository-status">
-            <div>
+          <div className="flex items-center justify-between gap-[14px] min-h-[44px] py-[10px] px-[24px] border-b border-border text-muted-foreground text-[12px] compact:py-[10px] compact:px-[14px]">
+            <div className="flex gap-[10px] items-center min-w-0">
               {dirty.length > 0 ? (
                 <>
-                  <span className="status-dot dirty" />
-                  <strong>
+                  <span className="inline-block size-[7px] flex-none rounded-full bg-dirty" />
+                  <strong className="text-foreground font-medium compact:text-[11px]">
                     {branchesWithChanges}{" "}
                     {branchesWithChanges === 1 ? "branch has" : "branches have"} uncommitted changes
                   </strong>
-                  <span>
+                  <span className="compact:hidden">
                     {dirty.reduce((sum, tree) => sum + tree.files.length, 0)} files across working
                     copies
                   </span>
                 </>
               ) : (
                 <>
-                  <Check />
-                  <strong>All working copies are clean</strong>
+                  <Check className="size-[15px] text-primary" />
+                  <strong className="text-foreground font-medium compact:text-[11px]">
+                    All working copies are clean
+                  </strong>
                 </>
               )}
               {unavailable.length > 0 && (
-                <button className="unavailable-link" onClick={() => setInfoDialog(true)}>
-                  <AlertTriangle />
+                <button
+                  className="inline-flex gap-[4px] items-center text-destructive"
+                  onClick={() => setInfoDialog(true)}
+                >
+                  <AlertTriangle className="size-[15px] text-inherit" />
                   {unavailable.length} unavailable
                 </button>
               )}
             </div>
-            <span>
+            <span className="compact:hidden">
               {snapshot.refs.filter((ref) => ref.kind === "branch").length} branches
-              <span className="status-separator">·</span>
+              <span className="py-0 px-[9px]">·</span>
               {demo ? "Illustrative data" : "Entire repository"}
             </span>
           </div>
           <ResizableSplit
             id={narrow ? "workspace-stacked" : "workspace-horizontal"}
             orientation={narrow ? "vertical" : "horizontal"}
-            className="workspace"
+            className="flex-1 min-h-0 min-w-0"
             primarySize={narrow ? "32%" : undefined}
             secondarySize={narrow ? "68%" : 460}
             primaryMin={narrow ? 160 : 280}
@@ -474,9 +486,14 @@ export default function App() {
           }}
         />
       )}
-      <footer className="app-statusbar">
-        <span>
-          <span className={`status-dot ${repository.isError ? "unavailable" : "connected"}`} />
+      <footer className="h-[30px] flex-none border-t border-border flex items-center justify-between gap-[16px] py-0 px-[20px] text-muted-foreground text-[10px] compact:py-0 compact:px-[10px]">
+        <span className="flex items-center gap-[10px] min-w-0">
+          <span
+            className={cn(
+              "inline-block size-[5px] flex-none rounded-full",
+              repository.isError ? "bg-destructive" : "bg-primary",
+            )}
+          />
           {refreshBusy
             ? "Refreshing repository…"
             : repository.isError
@@ -485,9 +502,9 @@ export default function App() {
                 ? `Scanned ${new Date(snapshot.scannedAt * 1000).toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit" })}`
                 : "Ready to open a repository"}
         </span>
-        <div>
+        <div className="flex items-center gap-[10px] min-w-0">
           {snapshot && (
-            <span className="statusbar-path" title={snapshot.commonDir}>
+            <span className="font-mono truncate compact:hidden" title={snapshot.commonDir}>
               {shortPath(snapshot.path)}
             </span>
           )}
@@ -554,7 +571,7 @@ export default function App() {
                 </Button>
               )}
               <Button type="submit" disabled={opening || !inputPath.trim() || !desktop}>
-                {opening && <LoaderCircle className="spin" data-icon="inline-start" />}Open
+                {opening && <LoaderCircle className="animate-spin" data-icon="inline-start" />}Open
                 repository
               </Button>
             </DialogFooter>
@@ -573,7 +590,7 @@ export default function App() {
       </Dialog>
 
       <Dialog open={infoDialog} onOpenChange={setInfoDialog}>
-        <DialogContent className="repository-info">
+        <DialogContent className="max-h-[85dvh]">
           <DialogHeader>
             <DialogTitle>{snapshot?.name ?? "Repository"}</DialogTitle>
             <DialogDescription>
@@ -581,22 +598,25 @@ export default function App() {
             </DialogDescription>
           </DialogHeader>
           {snapshot && (
-            <div className="repository-info-scroll">
-              <div className="info-path">
-                <Database />
-                <code>{snapshot.commonDir}</code>
+            <div className="overflow-y-auto min-h-0 max-h-[60dvh] pr-[7px]">
+              <div className="flex items-center gap-[8px] text-muted-foreground">
+                <Database className="size-[15px] flex-none" />
+                <code className="min-w-0 text-[10px] wrap-anywhere">{snapshot.commonDir}</code>
                 <CopyButton value={snapshot.commonDir} label="Copy common Git directory" />
               </div>
-              <h3>Branches & working copies</h3>
+              <h3 className="text-[12px] font-semibold mt-[24px] mx-0 mb-[10px]">
+                Branches & working copies
+              </h3>
               {snapshot.worktrees.map((tree) => (
-                <div className="info-branch" key={tree.path}>
-                  <div>
-                    <GitBranch />
-                    <strong>
+                <div className="py-[10px] px-0 border-b border-border" key={tree.path}>
+                  <div className="flex items-center gap-[7px]">
+                    <GitBranch className="size-[13px] text-muted-foreground" />
+                    <strong className="text-[12px] min-w-0 wrap-anywhere">
                       {tree.branch ??
                         (tree.bare ? "Bare repository" : `Detached ${shortHash(tree.head)}`)}
                     </strong>
                     <Badge
+                      className="ml-auto text-[10px] leading-[1.333333]"
                       variant={tree.error ? "destructive" : tree.files.length ? "dirty" : "quiet"}
                     >
                       {tree.error
@@ -606,43 +626,55 @@ export default function App() {
                           : "Clean"}
                     </Badge>
                   </div>
-                  <p>{shortPath(tree.path)}</p>
-                  {tree.error && <p className="info-error">{tree.error}</p>}
-                  {tree.locked !== null && <p>Locked{tree.locked && `: ${tree.locked}`}</p>}
+                  <p className="text-[10px] text-muted-foreground font-mono mt-[6px] mr-0 mb-0 ml-[20px] wrap-anywhere">
+                    {shortPath(tree.path)}
+                  </p>
+                  {tree.error && (
+                    <p className="text-removed text-[10px] font-mono mt-[6px] mr-0 mb-0 ml-[20px] wrap-anywhere">
+                      {tree.error}
+                    </p>
+                  )}
+                  {tree.locked !== null && (
+                    <p className="text-[10px] text-muted-foreground font-mono mt-[6px] mr-0 mb-0 ml-[20px] wrap-anywhere">
+                      Locked{tree.locked && `: ${tree.locked}`}
+                    </p>
+                  )}
                 </div>
               ))}
-              <h3>Remotes</h3>
+              <h3 className="text-[12px] font-semibold mt-[24px] mx-0 mb-[10px]">Remotes</h3>
               {snapshot.remotes.length ? (
                 snapshot.remotes.map((remote) => (
-                  <div className="info-remote" key={remote.name}>
+                  <div className="flex flex-col gap-[6px] text-[11px]" key={remote.name}>
                     <strong>{remote.name}</strong>
-                    <code>{remote.url}</code>
+                    <code className="text-muted-foreground text-[10px] wrap-anywhere">
+                      {remote.url}
+                    </code>
                   </div>
                 ))
               ) : (
-                <p>No remotes configured.</p>
+                <p className="text-muted-foreground text-[12px]">No remotes configured.</p>
               )}
-              <h3>Stashes</h3>
+              <h3 className="text-[12px] font-semibold mt-[24px] mx-0 mb-[10px]">Stashes</h3>
               {snapshot.stashes.length ? (
                 snapshot.stashes.map((stash) => (
                   <button
-                    className="info-stash"
+                    className="flex gap-[10px] items-center text-left w-full py-[10px] px-0"
                     key={stash.selector}
                     onClick={() => {
                       select({ kind: "commit", oid: stash.oid });
                       setInfoDialog(false);
                     }}
                   >
-                    <Archive />
-                    <div>
+                    <Archive className="size-[14px] flex-none text-muted-foreground" />
+                    <div className="flex-1 flex flex-col gap-[4px] text-[12px]">
                       <strong>{stash.selector}</strong>
-                      <span>{stash.subject}</span>
+                      <span className="text-muted-foreground text-[11px]">{stash.subject}</span>
                     </div>
-                    <ChevronRight />
+                    <ChevronRight className="size-[14px] flex-none text-muted-foreground" />
                   </button>
                 ))
               ) : (
-                <p>No stashes.</p>
+                <p className="text-muted-foreground text-[12px]">No stashes.</p>
               )}
             </div>
           )}
@@ -658,39 +690,53 @@ export default function App() {
               changes from the graph’s context menu.
             </DialogDescription>
           </DialogHeader>
-          <div className="shortcut-list">
-            <div>
+          <div className="flex flex-col gap-[14px] text-[12px]">
+            <div className="flex items-center justify-between gap-[12px]">
               <span>Open repository</span>
-              <kbd>⌘ / Ctrl O</kbd>
+              <kbd className="text-muted-foreground text-[10px] bg-secondary py-[4px] px-[6px] rounded-[4px]">
+                ⌘ / Ctrl O
+              </kbd>
             </div>
-            <div>
+            <div className="flex items-center justify-between gap-[12px]">
               <span>Search loaded history</span>
-              <kbd>⌘ / Ctrl F</kbd>
+              <kbd className="text-muted-foreground text-[10px] bg-secondary py-[4px] px-[6px] rounded-[4px]">
+                ⌘ / Ctrl F
+              </kbd>
             </div>
-            <div>
+            <div className="flex items-center justify-between gap-[12px]">
               <span>Refresh</span>
-              <kbd>⌘ / Ctrl R</kbd>
+              <kbd className="text-muted-foreground text-[10px] bg-secondary py-[4px] px-[6px] rounded-[4px]">
+                ⌘ / Ctrl R
+              </kbd>
             </div>
-            <div>
+            <div className="flex items-center justify-between gap-[12px]">
               <span>Previous / next node (graph focus)</span>
-              <kbd>↑ / ↓</kbd>
+              <kbd className="text-muted-foreground text-[10px] bg-secondary py-[4px] px-[6px] rounded-[4px]">
+                ↑ / ↓
+              </kbd>
             </div>
-            <div>
+            <div className="flex items-center justify-between gap-[12px]">
               <span>Compare with selected</span>
-              <kbd>Right-click → Diff</kbd>
+              <kbd className="text-muted-foreground text-[10px] bg-secondary py-[4px] px-[6px] rounded-[4px]">
+                Right-click → Diff
+              </kbd>
             </div>
-            <div>
+            <div className="flex items-center justify-between gap-[12px]">
               <span>Quick compare</span>
-              <kbd>⌘ / Ctrl click</kbd>
+              <kbd className="text-muted-foreground text-[10px] bg-secondary py-[4px] px-[6px] rounded-[4px]">
+                ⌘ / Ctrl click
+              </kbd>
             </div>
-            <div>
+            <div className="flex items-center justify-between gap-[12px]">
               <span>Show this help</span>
-              <kbd>?</kbd>
+              <kbd className="text-muted-foreground text-[10px] bg-secondary py-[4px] px-[6px] rounded-[4px]">
+                ?
+              </kbd>
             </div>
           </div>
-          <div className="shortcut-tip">
-            <GitCompareArrows />
-            <p>
+          <div className="flex gap-[12px] p-[13px] bg-secondary rounded-[6px]">
+            <GitCompareArrows className="size-[20px] text-primary flex-none" />
+            <p className="m-0 text-[12px] leading-[1.6] text-muted-foreground">
               Select a commit or an amber working changes node. Right-click another node and choose{" "}
               <strong>Diff with selected</strong>.
             </p>

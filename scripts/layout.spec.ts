@@ -23,7 +23,7 @@ test("details can be hidden and reopened without reopening on graph selection", 
   await page.goto("/");
   const inspector = page.getByLabel("Selection details");
   await expect(inspector).toBeVisible();
-  await expect(page.locator(".app-statusbar button")).toHaveCount(0);
+  await expect(page.locator("footer button")).toHaveCount(0);
   await expect(page.getByText(/Auto-refresh/)).toHaveCount(0);
   const graph = page.getByRole("region", { name: "Commit graph" });
   const original = await dimension(graph, "width");

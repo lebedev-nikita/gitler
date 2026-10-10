@@ -8,6 +8,12 @@ use wait_timeout::ChildExt;
 const OUTPUT_LIMIT: usize = 16 * 1024 * 1024;
 const DIFF_LIMIT: usize = 512 * 1024;
 
+#[derive(Clone, Copy)]
+enum OutputPolicy {
+    Complete,
+    Truncate(usize),
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileChange {
@@ -147,10 +153,19 @@ fn execute(command: Command) -> Result<Vec<u8>, String> {
     execute_with_diff_status(command, false)
 }
 
-fn execute_with_diff_status(
+fn execute_with_diff_status(command: Command, allow_difference: bool) -> Result<Vec<u8>, String> {
+    execute_with_output_policy(command, allow_difference, OutputPolicy::Complete)
+}
+
+fn execute_with_output_policy(
     mut command: Command,
     allow_difference: bool,
+    policy: OutputPolicy,
 ) -> Result<Vec<u8>, String> {
+    let limit = match policy {
+        OutputPolicy::Complete => OUTPUT_LIMIT,
+        OutputPolicy::Truncate(limit) => limit,
+    };
     let mut child = command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -169,8 +184,8 @@ fn execute_with_diff_status(
             if count == 0 {
                 break;
             }
-            if bytes.len() < OUTPUT_LIMIT + 1 {
-                let remaining = OUTPUT_LIMIT + 1 - bytes.len();
+            if bytes.len() < limit + 1 {
+                let remaining = limit + 1 - bytes.len();
                 bytes.extend_from_slice(&buffer[..count.min(remaining)]);
             }
         }
@@ -198,7 +213,7 @@ fn execute_with_diff_status(
     if !status.success() && !(allow_difference && status.code() == Some(1)) {
         return Err(String::from_utf8_lossy(&errors).trim().to_string());
     }
-    if bytes.len() > OUTPUT_LIMIT {
+    if matches!(policy, OutputPolicy::Complete) && bytes.len() > limit {
         return Err(
             "Git output exceeds 16 MiB. Narrow the history or choose a smaller file.".into(),
         );
@@ -216,6 +231,13 @@ fn in_repo(common: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
     let mut command = git_command();
     command.arg("--git-dir").arg(common).args(args);
     execute(command)
+}
+
+fn in_repo_truncated(common: &Path, args: &[&str], limit: usize) -> Result<Vec<u8>, String> {
+    let mut command = git_command();
+    command.arg("--git-dir").arg(common).args(args);
+    // Retain one extra byte to detect truncation, but drain all output and check Git's exit status.
+    execute_with_output_policy(command, false, OutputPolicy::Truncate(limit))
 }
 
 fn string(bytes: &[u8]) -> String {
@@ -1152,15 +1174,21 @@ pub fn branch_context(
         .as_ref()
         .map(|base| format!("{base}..{head}"))
         .unwrap_or_else(|| head.clone());
+    let commits = in_repo_truncated(
+        &common,
+        &["log", "-80", "--format=%s%n%b", &range, "--"],
+        64 * 1024,
+    )?;
     let mut text = format!(
-        "Current branch: {branch}\nHEAD: {head}\nCommits:\n{}\nCommitted patch:\n",
-        string(&in_repo(
-            &common,
-            &["log", "-80", "--format=%s%n%b", &range, "--",]
-        )?)
+        "Current branch: {branch}\nHEAD: {head}\nCommits:\n{}",
+        string(&commits[..commits.len().min(64 * 1024)])
     );
+    if commits.len() > 64 * 1024 {
+        text.push_str("\n[Commit messages truncated]\n");
+    }
+    text.push_str("\nCommitted patch:\n");
     let patch = if let Some(base) = base.as_deref() {
-        in_repo(
+        in_repo_truncated(
             &common,
             &[
                 "diff",
@@ -1171,9 +1199,10 @@ pub fn branch_context(
                 &head,
                 "--",
             ],
+            192 * 1024,
         )?
     } else {
-        in_repo(
+        in_repo_truncated(
             &common,
             &[
                 "show",
@@ -1184,6 +1213,7 @@ pub fn branch_context(
                 &head,
                 "--",
             ],
+            192 * 1024,
         )?
     };
     text.push_str(&string(&patch[..patch.len().min(192 * 1024)]));

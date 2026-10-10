@@ -72,7 +72,7 @@ test("arrow keys navigate filtered graph nodes without changing selection from t
   await nodes.first().press("ArrowDown");
   await expect(nodes.nth(1)).toHaveAttribute("aria-pressed", "true");
   await expect(nodes.nth(1)).toBeFocused();
-  const diff = page.locator(".diff-scroll");
+  const diff = page.getByLabel(/^Diff for /);
   await diff.focus();
   await diff.press("ArrowDown");
   await expect(nodes.nth(1)).toHaveAttribute("aria-pressed", "true");

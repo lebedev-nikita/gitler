@@ -10,6 +10,28 @@ from unittest.mock import patch
 import release
 
 
+CASK = '''cask "gitler" do
+  arch arm: "arm64", intel: "x64"
+
+  version "0.2.1"
+  sha256 arm:   "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+         intel: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+  url "https://github.com/lebedev-nikita/gitler/releases/download/v#{version}/Gitler_#{version}_macos-#{arch}.app.tar.gz"
+  app "Gitler.app"
+  binary "#{appdir}/Gitler.app/Contents/MacOS/gitler"
+end
+'''
+
+
+def macos_checksums(app_version):
+    return (
+        f'{"1" * 64}  Gitler_{app_version}_macos-arm64.app.tar.gz\n'
+        f'{"2" * 64}  Gitler_{app_version}_macos-x64.app.tar.gz\n'
+        f'{"3" * 64}  Gitler_{app_version}_macos-arm64.dmg\n'
+    )
+
+
 class ReleaseTests(unittest.TestCase):
     def test_drafts_use_the_correct_release_channel_and_numeric_id(self):
         for app_version, prerelease, latest in [
@@ -73,6 +95,88 @@ class ReleaseTests(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "Missing platform downloads"):
                 release.publish("v0.2.0-rc.1")
             gh.assert_not_called()
+
+
+class TapTests(unittest.TestCase):
+    def test_updates_only_version_and_architecture_archive_hashes(self):
+        for app_version in ("0.2.2", "0.3.0-rc.1", "0.3.0+build-1"):
+            with self.subTest(version=app_version):
+                expected = CASK.replace('version "0.2.1"', f'version "{app_version}"')
+                expected = expected.replace("a" * 64, "1" * 64).replace("b" * 64, "2" * 64)
+                self.assertEqual(release.tap_cask(CASK, app_version, macos_checksums(app_version)), expected)
+
+    def test_missing_duplicate_or_invalid_checksums_are_rejected(self):
+        valid = macos_checksums("0.2.2")
+        for checksums in (
+            "", valid.splitlines()[0], valid + valid.splitlines()[0] + "\n",
+            valid.replace("1" * 64, "not-a-sha256"), macos_checksums("0.2.1"),
+        ):
+            with self.subTest(checksums=checksums), self.assertRaisesRegex(SystemExit, "Expected one SHA-256"):
+                release.tap_cask(CASK, "0.2.2", checksums)
+
+    def test_unexpected_cask_layout_is_rejected(self):
+        for source in (CASK.replace('  version "0.2.1"\n', ""), CASK + CASK, CASK.replace("intel:", "x64:")):
+            with self.subTest(source=source), self.assertRaisesRegex(SystemExit, "Unexpected version or architecture"):
+                release.tap_cask(source, "0.2.2", macos_checksums("0.2.2"))
+
+    def test_draft_release_cannot_update_tap(self):
+        with patch.object(release, "version", return_value="0.2.2"), \
+                patch.object(release, "release", return_value={"isDraft": True}), \
+                patch.object(release, "gh") as gh, \
+                patch.object(release.subprocess, "run") as run:
+            with self.assertRaisesRegex(SystemExit, "Publish the release"):
+                release.update_tap("v0.2.2", "unused")
+            gh.assert_not_called()
+            run.assert_not_called()
+
+    def test_commits_only_cask_pushes_and_can_retry_a_failed_push(self):
+        def git(*args):
+            return release.subprocess.check_output(["git", *map(str, args)], text=True, stderr=release.subprocess.STDOUT).strip()
+
+        with tempfile.TemporaryDirectory() as directory:
+            remote = Path(directory) / "remote.git"
+            tap = Path(directory) / "tap"
+            git("init", "--bare", "--initial-branch=main", remote)
+            git("clone", remote, tap)
+            git("-C", tap, "config", "user.name", "Test")
+            git("-C", tap, "config", "user.email", "test@example.com")
+            (tap / "Casks").mkdir()
+            cask = tap / "Casks/gitler.rb"
+            cask.write_text(CASK)
+            git("-C", tap, "add", "Casks/gitler.rb")
+            git("-C", tap, "commit", "-m", "Initial cask")
+            git("-C", tap, "push", "origin", "HEAD:main")
+            (tap / "unrelated.txt").write_text("Keep this staged\n")
+            git("-C", tap, "add", "unrelated.txt")
+
+            def download(*args):
+                self.assertEqual(args[:3], ("release", "download", "v0.2.2"))
+                self.assertEqual(args[-2:], ("--pattern", "SHA256SUMS.txt"))
+                (Path(args[args.index("--dir") + 1]) / "SHA256SUMS.txt").write_text(macos_checksums("0.2.2"))
+
+            run = release.subprocess.run
+
+            def fail_push(args, **kwargs):
+                if "push" in args:
+                    raise release.subprocess.CalledProcessError(1, args)
+                return run(args, **kwargs, capture_output=True)
+
+            with patch.object(release, "version", return_value="0.2.2"), \
+                    patch.object(release, "release", return_value={"isDraft": False}), \
+                    patch.object(release, "gh", side_effect=download):
+                with patch.object(release.subprocess, "run", side_effect=fail_push):
+                    with self.assertRaises(release.subprocess.CalledProcessError):
+                        release.update_tap("v0.2.2", tap)
+                committed = git("-C", tap, "rev-parse", "HEAD")
+                self.assertNotEqual(git("--git-dir", remote, "rev-parse", "main"), committed)
+                release.update_tap("v0.2.2", tap)
+                release.update_tap("v0.2.2", tap)
+
+            self.assertEqual(git("--git-dir", remote, "rev-parse", "main"), committed)
+            self.assertEqual(git("-C", tap, "rev-list", "--count", "HEAD"), "2")
+            self.assertEqual(git("-C", tap, "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"), "Casks/gitler.rb")
+            self.assertEqual(git("-C", tap, "diff", "--cached", "--name-only"), "unrelated.txt")
+            self.assertEqual(git("--git-dir", remote, "show", "main:Casks/gitler.rb"), release.tap_cask(CASK, "0.2.2", macos_checksums("0.2.2")).strip())
 
 
 if __name__ == "__main__":

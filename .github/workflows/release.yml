@@ -228,7 +228,7 @@ jobs:
 
   publish:
     if: needs.prepare.outputs.release_id != ''
-    name: Verify downloads and publish
+    name: Verify downloads, publish, and update Homebrew
     needs: [prepare, build]
     timeout-minutes: 5
     runs-on: ubuntu-22.04
@@ -238,12 +238,24 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.prepare.outputs.ref }}
+      - name: Check out the Homebrew tap for writing
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: jeff-business/homebrew-tap
+          ref: main
+          path: homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
       - name: Verify all platforms, attach checksums, and publish
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
         run: |
           python3 scripts/release.py publish "$RELEASE_TAG"
+      - name: Update the Homebrew cask and push its commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+        run: python3 scripts/release.py update-tap "$RELEASE_TAG" homebrew-tap
 
   budget:
     name: Check three-minute pipeline budget

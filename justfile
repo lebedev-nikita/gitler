@@ -18,6 +18,7 @@ typecheck:
 
 lint:
     bunx oxlint src scripts
+    bun run lint:css
 
 format:
     bunx oxfmt .

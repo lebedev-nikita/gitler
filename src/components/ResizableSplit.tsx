@@ -61,7 +61,7 @@ export function ResizableSplit({
     >
       <ResizablePanel
         id={primaryId}
-        className="resizable-pane"
+        className="flex flex-col min-w-0 min-h-0 overflow-hidden"
         defaultSize={secondary ? primarySize : "100%"}
         minSize={primaryMin}
       >
@@ -69,10 +69,14 @@ export function ResizableSplit({
       </ResizablePanel>
       {secondary && (
         <>
-          <ResizableHandle className="pane-resize-handle" aria-label={label} withHandle />
+          <ResizableHandle
+            className="touch-none aria-[orientation=vertical]:w-1 aria-[orientation=horizontal]:h-1 [&>div]:bg-muted-foreground hover:bg-primary focus-visible:bg-primary data-[separator=active]:bg-primary"
+            aria-label={label}
+            withHandle
+          />
           <ResizablePanel
             id={secondaryId}
-            className="resizable-pane"
+            className="flex flex-col min-w-0 min-h-0 overflow-hidden"
             defaultSize={secondarySize}
             minSize={secondaryMin}
           >
