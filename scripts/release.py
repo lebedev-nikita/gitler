@@ -25,7 +25,7 @@ def version(tag):
 
 
 def release(tag):
-    return json.loads(gh("release", "view", tag, "--json", "id,isDraft,assets,targetCommitish,url"))
+    return json.loads(gh("release", "view", tag, "--json", "apiUrl,isDraft,assets,targetCommitish,url"))
 
 
 def prepare(tag):
@@ -38,9 +38,11 @@ def prepare(tag):
     data = release(tag)
     if not data["isDraft"]:
         raise SystemExit("This version is already published; create a new version instead")
-    # gh's id field is a GraphQL node ID; tauri-action expects the numeric REST ID.
-    releases = json.loads(gh("api", f"repos/{os.environ['GITHUB_REPOSITORY']}/releases"))
-    numeric_id = next(item["id"] for item in releases if item["tag_name"] == tag)
+    # Resolve the draft directly: GitHub's release list may lag behind creation.
+    # tauri-action expects the numeric REST ID, not a GraphQL node ID.
+    numeric_id = data["apiUrl"].rsplit("/", 1)[-1]
+    if not numeric_id.isdigit():
+        raise SystemExit("GitHub returned an invalid release ID")
     with open(os.environ["GITHUB_OUTPUT"], "a") as output:
         output.write(f"id={numeric_id}\ntag={tag}\n")
 
