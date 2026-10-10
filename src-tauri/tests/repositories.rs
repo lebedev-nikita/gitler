@@ -247,6 +247,63 @@ fn includes_detached_heads_and_reports_missing_worktrees() {
 }
 
 #[test]
+fn hides_checkpoints_without_losing_history_or_detached_worktrees() {
+    let repo = repo();
+    let first = git(repo.path(), &["rev-parse", "HEAD"]);
+    let tree = git(repo.path(), &["rev-parse", "HEAD^{tree}"]);
+    let mut checkpoints = Vec::new();
+    // More checkpoints than the minimum history limit must not crowd out real commits.
+    for turn in 0..55 {
+        let reference = format!("refs/t3/checkpoints/test-thread/turn/{turn}");
+        let message = format!("t3 checkpoint ref={reference}");
+        let oid = git(repo.path(), &["commit-tree", &tree, "-m", &message]);
+        git(repo.path(), &["update-ref", &reference, &oid]);
+        checkpoints.push((reference, oid));
+    }
+
+    let holder = TempDir::new().unwrap();
+    let worktree = holder.path().join("detached");
+    git(
+        repo.path(),
+        &["worktree", "add", "--detach", worktree.to_str().unwrap()],
+    );
+    // The ref namespace, rather than the commit message, identifies checkpoints.
+    git(
+        &worktree,
+        &["commit", "--allow-empty", "-m", "t3 checkpoint"],
+    );
+    let detached = git(&worktree, &["rev-parse", "HEAD"]);
+    let index = fs::read(repo.path().join(".git/index")).unwrap();
+
+    for path in [repo.path(), worktree.as_path()] {
+        let snapshot = git::snapshot(path.to_str().unwrap(), 50).unwrap();
+        assert_eq!(snapshot.commits.len(), 2);
+        assert!(!snapshot.has_more);
+        assert!(snapshot.commits.iter().any(|commit| commit.oid == first));
+        assert!(snapshot.commits.iter().any(|commit| commit.oid == detached));
+        assert_eq!(snapshot.worktrees.len(), 2);
+        assert!(snapshot
+            .refs
+            .iter()
+            .all(|reference| !reference.full_name.starts_with("refs/t3/checkpoints/")));
+        assert_eq!(
+            git::resolve_commit(&snapshot.common_dir, &first[..7]).unwrap(),
+            first
+        );
+        for (_, oid) in &checkpoints {
+            assert!(git::resolve_commit(&snapshot.common_dir, oid).is_err());
+            assert!(git::resolve_commit(&snapshot.common_dir, &oid[..7]).is_err());
+        }
+    }
+
+    assert_eq!(fs::read(repo.path().join(".git/index")).unwrap(), index);
+    assert_eq!(git(repo.path(), &["rev-parse", "HEAD"]), first);
+    for (reference, oid) in checkpoints {
+        assert_eq!(git(repo.path(), &["rev-parse", &reference]), oid);
+    }
+}
+
+#[test]
 fn supports_unborn_and_bare_repositories_and_rejects_invalid_input() {
     let empty = TempDir::new().unwrap();
     git(empty.path(), &["init", "-b", "main"]);

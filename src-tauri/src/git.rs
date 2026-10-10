@@ -327,6 +327,19 @@ pub fn resolve_commit(common_dir: &str, revision: &str) -> Result<String, String
     let output = in_repo(&common, &["rev-parse", "--verify", &expression])?;
     let oid = string(&output).trim().to_string();
     valid_oid(&oid)?;
+    let checkpoints = in_repo(
+        &common,
+        &[
+            "for-each-ref",
+            "--format=%(refname)",
+            "--points-at",
+            &oid,
+            "refs/t3/checkpoints",
+        ],
+    )?;
+    if !checkpoints.is_empty() {
+        return Err("T3 checkpoints are hidden from the repository history".into());
+    }
     Ok(oid)
 }
 
@@ -335,6 +348,8 @@ fn log_commits(common: &Path, worktrees: &[Worktree], limit: usize) -> Result<Ve
     let mut command = git_command();
     command.arg("--git-dir").arg(common).args([
         "log",
+        // Exclude service snapshots before pagination; keep real worktree heads below.
+        "--exclude=refs/t3/checkpoints/*",
         "--all",
         "--topo-order",
         "-z",
