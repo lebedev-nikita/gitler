@@ -14,7 +14,7 @@ TypeScript, and shadcn/ui. Currently supported only on macOS with Apple Silicon.
 - Inspects staged, unstaged, and untracked files without switching branches.
 - Compares two commits or a commit and a worktree's current files: select one node,
   right-click another, and choose **Diff with selected**. The diff opens on the right.
-- Suggests local branch names with your installed Codex CLI, then lets you review and apply the rename.
+- Renames local branches manually or suggests names with your installed Codex CLI for review.
 - Discards selected staged, unstaged, and untracked files in a chosen working copy after confirmation.
 - Fetches remote branches in the background and shows new commits without changing local work.
 - Opens GitHub and other supported remote repositories in your default browser.
@@ -38,13 +38,14 @@ the button beside **Changed files** toggles just the diff preview. Panel sizes a
 visibility are remembered. Focus a boundary and use the arrow keys to resize it
 with the keyboard.
 
-Right-click a local branch label, its tip commit, or an uncommitted node to rename
-the branch with Codex, discard its working changes, or delete a merged branch with
-its linked worktrees. Renaming requires a current
+Right-click a local branch label, its tip commit, or an uncommitted node and choose
+**Rename branch…**. Enter a name manually, or use the **Generate with AI** sparkle
+icon beside the field to suggest one from the branch's changes. AI generation requires a current
 [Codex CLI](https://developers.openai.com/codex/cli) installation and `codex login`;
 Gitler detects common installation paths and accepts an explicit executable path.
 The selected branch's commits and working diffs are sent to Codex for generation.
 The suggested name is editable before applying a local rename; remote names are unchanged.
+Manual renaming works without Codex. The same context menu offers selected-file discards and merged-branch deletion with linked worktrees.
 
 Discarding restores selected files to HEAD in both the index and working copy.
 Selected untracked and newly added files are deleted permanently. Gitler verifies
