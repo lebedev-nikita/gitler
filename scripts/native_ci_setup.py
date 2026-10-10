@@ -2,8 +2,10 @@
 
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import traceback
 
@@ -50,8 +52,13 @@ def worker(name, arguments):
                 "--no-self-update", "--target", arguments[0],
             ]]
         elif name == "linux":
-            archives = Path(os.environ["RUNNER_TEMP"]) / "gitler-apt-archives"
+            # RUNNER_TEMP may be private to the runner. APT's unprivileged
+            # downloader needs a traversable parent; copy cache files to /tmp.
+            cached_archives = Path(os.environ["RUNNER_TEMP"]) / "gitler-apt-archives"
+            archives = Path(tempfile.gettempdir()) / "gitler-apt-archives"
             archives.mkdir(parents=True, exist_ok=True)
+            for package in cached_archives.glob("*.deb"):
+                shutil.copyfile(package, archives / package.name)
             commands = [
                 ["sudo", "apt-get", "update"],
                 ["sudo", "apt-get", "-o", f"Dir::Cache::archives={archives}",
@@ -64,6 +71,10 @@ def worker(name, arguments):
         for command in commands:
             print("Running: " + " ".join(command), flush=True)
             subprocess.run(command, check=True)
+        if name == "linux":
+            cached_archives.mkdir(parents=True, exist_ok=True)
+            for package in archives.glob("*.deb"):
+                shutil.copyfile(package, cached_archives / package.name)
         code = 0
     except subprocess.CalledProcessError as error:
         code = error.returncode or 1
