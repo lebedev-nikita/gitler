@@ -1,4 +1,4 @@
-Gitler 0.3.2 adds safe cleanup of merged branches and their linked worktrees.
+Gitler 0.3.3 adds safe cleanup of merged branches and their linked worktrees.
 
 ## Changes
 

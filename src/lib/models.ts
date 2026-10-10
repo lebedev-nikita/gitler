@@ -33,6 +33,13 @@ export const CommitSchema = Schema.Struct({
 });
 export type Commit = typeof CommitSchema.Type;
 
+export const BranchIntegrationSchema = Schema.Struct({
+  target: Schema.String,
+  kind: Schema.Literals(["ancestry", "patch"]),
+  commit: Schema.NullOr(Schema.String),
+});
+export type BranchIntegration = typeof BranchIntegrationSchema.Type;
+
 export const ReferenceSchema = Schema.Struct({
   name: Schema.String,
   fullName: Schema.String,
@@ -42,6 +49,7 @@ export const ReferenceSchema = Schema.Struct({
   ahead: Schema.Number,
   behind: Schema.Number,
   mergedInto: Schema.NullOr(Schema.String),
+  integration: Schema.NullOr(BranchIntegrationSchema),
 });
 export type Reference = typeof ReferenceSchema.Type;
 

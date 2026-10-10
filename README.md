@@ -27,6 +27,11 @@ labels; filters appear only when you open **Filters**. To inspect or compare a
 commit outside the loaded history, enter its hash in search and press Enter. It
 stays in the graph for selection and right-click comparisons.
 
+Branch labels show **Merged into main** for commits in the main branch's history,
+or **Changes in main** when all committed changes match after squash, rebase, or
+cherry-pick. The graph preserves the original commit connections. Uncommitted
+work remains visible separately.
+
 Drag the boundary between the graph and inspector, or between the file list and
 diff preview, to resize the panels. The toolbar toggles the entire inspector;
 the button beside **Changed files** toggles just the diff preview. Panel sizes and

@@ -108,6 +108,7 @@ export function demoSnapshot(): Snapshot {
         ahead: 0,
         behind: 0,
         mergedInto: null,
+        integration: null,
       })),
       {
         name: "origin/main",
@@ -118,6 +119,7 @@ export function demoSnapshot(): Snapshot {
         upstream: null,
         ahead: 0,
         behind: 0,
+        integration: null,
       },
       {
         name: "v0.1.0",
@@ -128,6 +130,7 @@ export function demoSnapshot(): Snapshot {
         upstream: null,
         ahead: 0,
         behind: 0,
+        integration: null,
       },
     ],
     stashes: [

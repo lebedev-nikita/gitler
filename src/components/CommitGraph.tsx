@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
+  Check,
   Copy,
   GitCompareArrows,
   GitFork,
@@ -380,6 +381,14 @@ export function CommitGraph({
               const dirtyCopies = workingCopies.filter(
                 (tree) => tree.files.length > 0 && !tree.error && !tree.bare,
               );
+              const integration = row.node.worktree
+                ? null
+                : refsFor(row.node.id).find((ref) => ref.integration)?.integration;
+              const integrationLabel = integration
+                ? integration.kind === "ancestry"
+                  ? `Merged into ${integration.target}`
+                  : `Changes in ${integration.target}`
+                : null;
               return (
                 <div
                   className="absolute left-0 right-0 h-[42px]"
@@ -433,6 +442,21 @@ export function CommitGraph({
                           {row.node.subject}
                         </span>
                         <span className="flex items-center flex-none gap-[5px] max-w-[48%] overflow-hidden narrow:max-w-full narrow:empty:hidden">
+                          {integration && (
+                            <Badge
+                              variant="integrated"
+                              className="h-[18px] py-0 px-[5px] rounded-[4px] text-[10px] leading-[1.333333]"
+                              data-integration={integration.kind}
+                              title={
+                                integration.kind === "ancestry"
+                                  ? `This branch is part of ${integration.target}'s commit history.`
+                                  : `All committed changes match changes in ${integration.target}, as after squash or rebase.${integration.commit ? ` Matching commit: ${shortHash(integration.commit)}.` : ""} Original commit links are preserved.`
+                              }
+                            >
+                              <Check data-icon="inline-start" aria-hidden="true" />
+                              {integrationLabel}
+                            </Badge>
+                          )}
                           {row.node.worktree ? (
                             <>
                               <Badge
