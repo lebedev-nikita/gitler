@@ -25,6 +25,12 @@ labels; filters appear only when you open **Filters**. To inspect or compare a
 commit outside the loaded history, enter its hash in search and press Enter. It
 stays in the graph for selection and right-click comparisons.
 
+Drag the boundary between the graph and inspector, or between the file list and
+diff preview, to resize the panels. The toolbar toggles the entire inspector;
+the button beside **Changed files** toggles just the diff preview. Panel sizes and
+visibility are remembered. Focus a boundary and use the arrow keys to resize it
+with the keyboard.
+
 Right-click a local branch label, its tip commit, or an uncommitted node to rename
 the branch with Codex or discard its working changes. Renaming requires a current
 [Codex CLI](https://developers.openai.com/codex/cli) installation and `codex login`;

@@ -14,6 +14,8 @@ import {
   GitFork,
   Info,
   LoaderCircle,
+  PanelRightClose,
+  PanelRightOpen,
   RefreshCw,
   Terminal,
 } from "lucide-react";
@@ -33,12 +35,17 @@ import { Separator } from "@/components/ui/separator";
 import { CommitGraph } from "@/components/CommitGraph";
 import { GraphActions } from "@/components/GraphActions";
 import { Inspector } from "@/components/Inspector";
+import type { InspectorView } from "@/components/Inspector";
+import { ResizableSplit } from "@/components/ResizableSplit";
+import { useNarrowLayout, useStoredBoolean } from "@/hooks/use-layout";
 import { CopyButton, ErrorMessage, Loading, shortHash, shortPath } from "@/components/common";
 import { DEMO_PATH } from "@/lib/demo";
 import { desktop, isDemo, repositoryApi } from "@/lib/repository";
 import { selectionId } from "@/lib/models";
 import type { Commit, Comparison, GraphAction, Selection } from "@/lib/models";
 import { mergeCommitHistory } from "@/lib/graph";
+
+const initialInspectorView: InspectorView = { filePath: null, mode: "combined", metadata: false };
 
 function savedPath() {
   try {
@@ -54,7 +61,10 @@ export default function App() {
   const [limit, setLimit] = useState(400);
   const [selected, setSelected] = useState<Selection | null>(null);
   const [comparison, setComparison] = useState<Comparison | null>(null);
-  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [inspectorView, setInspectorView] = useState(initialInspectorView);
+  const [inspectorOpen, setInspectorOpen] = useStoredBoolean("gitler.inspector-open", true);
+  const [previewOpen, setPreviewOpen] = useStoredBoolean("gitler.diff-preview-open", true);
+  const narrow = useNarrowLayout();
   const [openDialog, setOpenDialog] = useState(false);
   const [graphAction, setGraphAction] = useState<GraphAction | null>(null);
   const [infoDialog, setInfoDialog] = useState(false);
@@ -62,7 +72,6 @@ export default function App() {
   const [inputPath, setInputPath] = useState("");
   const [opening, setOpening] = useState(false);
   const [openError, setOpenError] = useState<unknown>(null);
-  const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [resolved, setResolved] = useState<{ commonDir: string; commits: Commit[] } | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -73,7 +82,7 @@ export default function App() {
     queryKey: ["repository", path, limit],
     queryFn: () => repositoryApi.snapshot(path!, limit),
     enabled: !!path,
-    refetchInterval: autoRefresh ? 15000 : false,
+    refetchInterval: 15000,
   });
   const snapshot = useMemo(() => {
     const data = repository.data;
@@ -98,7 +107,7 @@ export default function App() {
   const select = useCallback((selection: Selection) => {
     setSelected(selection);
     setComparison(null);
-    setInspectorOpen(true);
+    setInspectorView(initialInspectorView);
   }, []);
   const openRepository = useCallback(
     async (requested: string) => {
@@ -124,6 +133,7 @@ export default function App() {
         setPath(target);
         setLimit(400);
         setComparison(null);
+        setInspectorView(initialInspectorView);
         setOpenDialog(false);
         const initialTree = result.worktrees.find((tree) => tree.files.length > 0 && !tree.error);
         setSelected(
@@ -133,7 +143,6 @@ export default function App() {
               ? { kind: "commit", oid: result.commits[0].oid }
               : null,
         );
-        setInspectorOpen(true);
         if (!isDemo(result.commonDir)) {
           try {
             localStorage.setItem("gitler.repository", result.commonDir);
@@ -221,7 +230,9 @@ export default function App() {
     )
       return;
     setComparison({ from: selected, to: other });
+    setInspectorView(initialInspectorView);
     setInspectorOpen(true);
+    setPreviewOpen(true);
   };
 
   return (
@@ -267,6 +278,17 @@ export default function App() {
           }}
         >
           <RefreshCw className={refreshBusy ? "spin" : undefined} />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={inspectorOpen ? "Hide details panel" : "Show details panel"}
+          title={inspectorOpen ? "Hide details panel" : "Show details panel"}
+          aria-expanded={inspectorOpen && !!selected}
+          disabled={!snapshot || !selected}
+          onClick={() => setInspectorOpen((value) => !value)}
+        >
+          {inspectorOpen ? <PanelRightClose /> : <PanelRightOpen />}
         </Button>
         <Button
           variant="ghost"
@@ -355,58 +377,78 @@ export default function App() {
               {demo ? "Illustrative data" : "Entire repository"}
             </span>
           </div>
-          <div className={`workspace ${inspectorOpen && selected ? "with-inspector" : ""}`}>
-            <CommitGraph
-              key={snapshot.commonDir}
-              snapshot={snapshot}
-              selected={selected}
-              select={select}
-              compare={compare}
-              comparison={comparison}
-              act={setGraphAction}
-              busy={repository.isLoading}
-              loadMore={() => setLimit((value) => Math.min(value + 1000, 20000))}
-              searchRef={searchRef}
-              jump={async (hash) => {
-                const commonDir = snapshot.commonDir;
-                const sequence = requestSequence.current;
-                const oid = await repositoryApi.resolveCommit(commonDir, hash);
-                if (!snapshot.commits.some((commit) => commit.oid === oid)) {
-                  const detail = await repositoryApi.detail(
-                    commonDir,
-                    { kind: "commit", oid },
-                    null,
-                  );
-                  if (sequence !== requestSequence.current) return;
-                  const commit: Commit = {
-                    oid: detail.oid,
-                    parents: detail.parents,
-                    author: detail.author,
-                    email: detail.email,
-                    timestamp: detail.timestamp,
-                    subject: detail.message.split("\n")[0],
-                  };
-                  setResolved((current) => ({
-                    commonDir,
-                    commits: [...(current?.commonDir === commonDir ? current.commits : []), commit],
-                  }));
-                }
-                if (sequence !== requestSequence.current) return;
-                select({ kind: "commit", oid });
-              }}
-            />
-            {inspectorOpen && selected && (
-              <Inspector
-                key={`${snapshot.commonDir}:${selectionId(selected)}:${comparison ? selectionId(comparison.to) : ""}`}
+          <ResizableSplit
+            id={narrow ? "workspace-stacked" : "workspace-horizontal"}
+            orientation={narrow ? "vertical" : "horizontal"}
+            className="workspace"
+            primarySize={narrow ? "32%" : undefined}
+            secondarySize={narrow ? "68%" : 460}
+            primaryMin={narrow ? 160 : 280}
+            secondaryMin={320}
+            label="Resize graph and details panels"
+            primary={
+              <CommitGraph
+                key={snapshot.commonDir}
                 snapshot={snapshot}
                 selected={selected}
-                comparison={comparison}
-                close={() => setInspectorOpen(false)}
-                clearComparison={() => setComparison(null)}
                 select={select}
+                compare={compare}
+                comparison={comparison}
+                act={setGraphAction}
+                busy={repository.isLoading}
+                loadMore={() => setLimit((value) => Math.min(value + 1000, 20000))}
+                searchRef={searchRef}
+                jump={async (hash) => {
+                  const commonDir = snapshot.commonDir;
+                  const sequence = requestSequence.current;
+                  const oid = await repositoryApi.resolveCommit(commonDir, hash);
+                  if (!snapshot.commits.some((commit) => commit.oid === oid)) {
+                    const detail = await repositoryApi.detail(
+                      commonDir,
+                      { kind: "commit", oid },
+                      null,
+                    );
+                    if (sequence !== requestSequence.current) return;
+                    const commit: Commit = {
+                      oid: detail.oid,
+                      parents: detail.parents,
+                      author: detail.author,
+                      email: detail.email,
+                      timestamp: detail.timestamp,
+                      subject: detail.message.split("\n")[0],
+                    };
+                    setResolved((current) => ({
+                      commonDir,
+                      commits: [
+                        ...(current?.commonDir === commonDir ? current.commits : []),
+                        commit,
+                      ],
+                    }));
+                  }
+                  if (sequence !== requestSequence.current) return;
+                  select({ kind: "commit", oid });
+                }}
               />
-            )}
-          </div>
+            }
+            secondary={
+              inspectorOpen && selected ? (
+                <Inspector
+                  key={`${snapshot.commonDir}:${selectionId(selected)}:${comparison ? selectionId(comparison.to) : ""}`}
+                  snapshot={snapshot}
+                  selected={selected}
+                  comparison={comparison}
+                  close={() => setInspectorOpen(false)}
+                  clearComparison={() => setComparison(null)}
+                  select={select}
+                  narrow={narrow}
+                  previewOpen={previewOpen}
+                  togglePreview={() => setPreviewOpen((value) => !value)}
+                  view={inspectorView}
+                  changeView={(patch) => setInspectorView((current) => ({ ...current, ...patch }))}
+                />
+              ) : undefined
+            }
+          />
         </>
       )}
       {snapshot && graphAction && (
@@ -449,13 +491,6 @@ export default function App() {
               {shortPath(snapshot.path)}
             </span>
           )}
-          <button
-            onClick={() => setAutoRefresh((value) => !value)}
-            disabled={!path}
-            aria-pressed={autoRefresh}
-          >
-            {autoRefresh ? "Auto-refresh · 15s" : "Auto-refresh paused"}
-          </button>
         </div>
       </footer>
 

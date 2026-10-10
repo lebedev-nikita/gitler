@@ -49,6 +49,7 @@ test("repository graph, working nodes, context-menu comparisons and filters", as
   await page
     .getByRole("button", { name: "Uncommitted changes on agent/auth-flow", exact: true })
     .click();
+  await page.getByRole("button", { name: "Show details panel" }).click();
   await page.getByRole("button", { name: "Staged", exact: true }).click();
   await expect(page.getByLabel("Changed files")).toContainText("src/auth/refresh.ts");
   await expect(page.getByLabel("Changed files")).not.toContainText("tests/auth.test.ts");

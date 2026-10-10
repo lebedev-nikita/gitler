@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
@@ -8,6 +8,8 @@ import {
   GitCommitHorizontal,
   GitCompareArrows,
   LockKeyhole,
+  PanelBottomClose,
+  PanelBottomOpen,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,6 +30,7 @@ import {
   shortPath,
 } from "./common";
 import { DiffView } from "./DiffView";
+import { ResizableSplit } from "./ResizableSplit";
 
 const statusLabels: Record<string, string> = {
   M: "Modified",
@@ -37,6 +40,12 @@ const statusLabels: Record<string, string> = {
   C: "Copied",
   U: "Conflict",
   "?": "Untracked",
+};
+
+export type InspectorView = {
+  filePath: string | null;
+  mode: DiffMode;
+  metadata: boolean;
 };
 
 export function selectionLabel(selection: Selection, snapshot: Snapshot): string {
@@ -51,6 +60,11 @@ export function Inspector({
   close,
   clearComparison,
   select,
+  narrow,
+  previewOpen,
+  togglePreview,
+  view,
+  changeView,
 }: {
   snapshot: Snapshot;
   selected: Selection;
@@ -58,10 +72,13 @@ export function Inspector({
   close: () => void;
   clearComparison: () => void;
   select: (selection: Selection) => void;
+  narrow: boolean;
+  previewOpen: boolean;
+  togglePreview: () => void;
+  view: InspectorView;
+  changeView: (patch: Partial<InspectorView>) => void;
 }) {
-  const [filePath, setFilePath] = useState<string | null>(null);
-  const [mode, setMode] = useState<DiffMode>("combined");
-  const [metadata, setMetadata] = useState(false);
+  const { filePath, mode, metadata } = view;
   const detailKey = [
     snapshot.commonDir,
     selectionId(selected),
@@ -91,14 +108,17 @@ export function Inspector({
       }),
     [detail.data, tree, comparison, mode],
   );
-  const file = files.find((file) => file.path === filePath) ?? files[0];
+  const selectedFile = files.find((file) => file.path === filePath) ?? files[0];
   const diff = useQuery({
-    queryKey: ["diff", ...detailKey, file?.path, mode],
-    enabled: !!file,
+    queryKey: ["diff", ...detailKey, selectedFile?.path, mode],
+    enabled: !!selectedFile && previewOpen,
     queryFn: () =>
-      repositoryApi.diff(makeDiffRequest(snapshot.commonDir, selected, comparison, file!, mode)),
+      repositoryApi.diff(
+        makeDiffRequest(snapshot.commonDir, selected, comparison, selectedFile!, mode),
+      ),
     placeholderData: (previousData, previousQuery) =>
-      previousQuery?.queryKey.at(-2) === file?.path && previousQuery?.queryKey.at(-1) === mode
+      previousQuery?.queryKey.at(-2) === selectedFile?.path &&
+      previousQuery?.queryKey.at(-1) === mode
         ? previousData
         : undefined,
   });
@@ -180,7 +200,7 @@ export function Inspector({
           <Button
             variant="ghost"
             size="xs"
-            onClick={() => setMetadata((value) => !value)}
+            onClick={() => changeView({ metadata: !metadata })}
             aria-expanded={metadata}
           >
             <ChevronRight className={cn(metadata && "rotate-90")} data-icon="inline-start" />
@@ -220,7 +240,7 @@ export function Inspector({
             size="sm"
             value={[mode]}
             onValueChange={(values) => {
-              if (values[0]) setMode(values[0] as DiffMode);
+              if (values[0]) changeView({ mode: values[0] as DiffMode });
             }}
             spacing={0}
             aria-label="Working changes view"
@@ -249,65 +269,91 @@ export function Inspector({
             <strong>Changed files</strong>
             <span>{files.length}</span>
             <span className="files-heading-status">Status</span>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label={previewOpen ? "Hide diff preview" : "Show diff preview"}
+              title={previewOpen ? "Hide diff preview" : "Show diff preview"}
+              aria-expanded={previewOpen}
+              onClick={togglePreview}
+            >
+              {previewOpen ? <PanelBottomClose /> : <PanelBottomOpen />}
+            </Button>
           </div>
-          <div className="changed-files" aria-label="Changed files">
-            {files.map((file: FileChange) => {
-              const status = fileStatus(file);
-              return (
-                <button
-                  key={file.path}
-                  className={cn(
-                    "changed-file",
-                    file.path === (filePath ?? files[0]?.path) && "active",
-                  )}
-                  aria-pressed={file.path === (filePath ?? files[0]?.path)}
-                  onClick={() => setFilePath(file.path)}
-                  title={`${file.oldPath ? `${file.oldPath} → ` : ""}${file.path} · ${statusLabels[status] ?? status}`}
-                >
-                  <span
-                    className={cn(
-                      "file-status",
-                      status === "?" && "untracked",
-                      status === "D" && "deleted",
-                      status === "U" && "conflict",
-                    )}
-                  >
-                    {status}
-                  </span>
-                  <span className="changed-file-path">{file.path}</span>
-                  {file.additions !== null && <span className="added">+{file.additions}</span>}
-                  {file.deletions !== null && <span className="removed">−{file.deletions}</span>}
-                </button>
-              );
-            })}
-          </div>
-          {files.length === 0 ? (
-            <EmptyMessage
-              icon={FileCode2}
-              title="No changed files"
-              description={
-                comparison
-                  ? "These versions have identical file contents."
-                  : tree
-                    ? "This view has no changes. Try another view or refresh the repository."
-                    : "This commit has no file changes relative to its first parent."
-              }
-            />
-          ) : diff.isPending ? (
-            <Loading text="Reading diff…" />
-          ) : diff.isError ? (
-            <div className="inspector-error">
-              <ErrorMessage
-                title="Could not read diff"
-                error={diff.error}
-                retry={() => {
-                  void diff.refetch();
-                }}
-              />
-            </div>
-          ) : diff.data && file ? (
-            <DiffView diff={diff.data} file={file.path} />
-          ) : null}
+          <ResizableSplit
+            id={narrow ? "inspector-stacked" : "inspector-horizontal"}
+            orientation="vertical"
+            className="inspector-content"
+            primarySize={narrow ? 64 : 120}
+            primaryMin={48}
+            secondaryMin={120}
+            label="Resize file list and diff preview"
+            primary={
+              <div className="changed-files" aria-label="Changed files">
+                {files.map((file: FileChange) => {
+                  const status = fileStatus(file);
+                  return (
+                    <button
+                      key={file.path}
+                      className={cn("changed-file", file.path === selectedFile?.path && "active")}
+                      aria-pressed={file.path === selectedFile?.path}
+                      onClick={() => changeView({ filePath: file.path })}
+                      title={`${file.oldPath ? `${file.oldPath} → ` : ""}${file.path} · ${statusLabels[status] ?? status}`}
+                    >
+                      <span
+                        className={cn(
+                          "file-status",
+                          status === "?" && "untracked",
+                          status === "D" && "deleted",
+                          status === "U" && "conflict",
+                        )}
+                      >
+                        {status}
+                      </span>
+                      <span className="changed-file-path">{file.path}</span>
+                      {file.additions !== null && <span className="added">+{file.additions}</span>}
+                      {file.deletions !== null && (
+                        <span className="removed">−{file.deletions}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            }
+            secondary={
+              previewOpen ? (
+                <div className="diff-preview" aria-label="Diff preview">
+                  {files.length === 0 ? (
+                    <EmptyMessage
+                      icon={FileCode2}
+                      title="No changed files"
+                      description={
+                        comparison
+                          ? "These versions have identical file contents."
+                          : tree
+                            ? "This view has no changes. Try another view or refresh the repository."
+                            : "This commit has no file changes relative to its first parent."
+                      }
+                    />
+                  ) : diff.isPending ? (
+                    <Loading text="Reading diff…" />
+                  ) : diff.isError ? (
+                    <div className="inspector-error">
+                      <ErrorMessage
+                        title="Could not read diff"
+                        error={diff.error}
+                        retry={() => {
+                          void diff.refetch();
+                        }}
+                      />
+                    </div>
+                  ) : diff.data && selectedFile ? (
+                    <DiffView diff={diff.data} file={selectedFile.path} />
+                  ) : null}
+                </div>
+              ) : undefined
+            }
+          />
         </>
       )}
     </aside>
