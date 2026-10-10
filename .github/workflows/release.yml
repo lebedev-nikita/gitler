@@ -22,6 +22,9 @@ on:
 permissions:
   contents: read
 
+env:
+  CARGO_INCREMENTAL: "0"
+
 concurrency:
   group: desktop-${{ (startsWith(github.ref, 'refs/tags/') || inputs.publish) && 'release' || 'check' }}-${{ inputs.tag || github.head_ref || github.ref_name }}
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') && !inputs.publish }}
@@ -128,13 +131,28 @@ jobs:
         with:
           toolchain: "1.99.0"
           targets: ${{ matrix.target }}
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      # Keep registry sources and build outputs together. Removing sources makes
+      # objc2's native build helpers invalidate the cached macOS dependency graph.
+      - name: Restore native release cache
+        id: native-cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          key: native-release-v1-${{ runner.os }}-${{ matrix.target }}-1.99.0-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target/release
+            src-tauri/target/${{ matrix.target }}/release/build
+            src-tauri/target/${{ matrix.target }}/release/deps
+            src-tauri/target/${{ matrix.target }}/release/.fingerprint
+      - name: Bootstrap from the previous dependency cache
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           workspaces: src-tauri -> target
           shared-key: release-${{ matrix.target }}
           cache-workspace-crates: true
-          cache-on-failure: true
-          save-if: ${{ github.ref == 'refs/heads/main' && !inputs.tag }}
+          save-if: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: frontend
@@ -158,6 +176,18 @@ jobs:
           workflowArtifactNamePattern: Gitler_[version]_${{ matrix.asset }}[ext]
           uploadUpdaterJson: false
           uploadUpdaterSignatures: false
+      - name: Save native release cache
+        if: always() && !cancelled() && github.ref == 'refs/heads/main' && !inputs.tag && steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          key: ${{ steps.native-cache.outputs.cache-primary-key }}
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target/release
+            src-tauri/target/${{ matrix.target }}/release/build
+            src-tauri/target/${{ matrix.target }}/release/deps
+            src-tauri/target/${{ matrix.target }}/release/.fingerprint
 
   publish:
     if: needs.prepare.outputs.release_id != ''
@@ -179,9 +209,9 @@ jobs:
           python3 scripts/release.py publish "$RELEASE_TAG"
 
   budget:
-    name: Check five-minute packaging budget
-    if: inputs.check_budget
-    needs: [prepare, build]
+    name: Check five-minute pipeline budget
+    if: always() && inputs.check_budget && needs.build.result == 'success' && (needs.publish.result == 'success' || needs.publish.result == 'skipped')
+    needs: [prepare, build, publish]
     runs-on: ubuntu-22.04
     timeout-minutes: 2
     permissions:
