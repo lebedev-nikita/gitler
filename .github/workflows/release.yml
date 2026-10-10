@@ -152,7 +152,7 @@ jobs:
           tagName: ${{ needs.prepare.outputs.tag }}
           releaseDraft: true
           tauriScript: bunx --bun @tauri-apps/cli@${{ needs.prepare.outputs.tauri_cli }}
-          args: --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config .github/tauri-ci.json
+          args: --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config '{"build":{"beforeBuildCommand":""}}'
           releaseAssetNamePattern: Gitler_[version]_${{ matrix.asset }}[ext]
           uploadWorkflowArtifacts: ${{ !needs.prepare.outputs.release_id }}
           workflowArtifactNamePattern: Gitler_[version]_${{ matrix.asset }}[ext]
