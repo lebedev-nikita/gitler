@@ -38,6 +38,27 @@ pub fn detach(enabled: bool) -> io::Result<bool> {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
+        use windows_sys::Win32::Foundation::{
+            SetHandleInformation, HANDLE_FLAG_INHERIT, INVALID_HANDLE_VALUE,
+        };
+        use windows_sys::Win32::System::Console::{
+            GetStdHandle, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE,
+        };
+        // Windows also inherits the original pipe handles, even with null stdio.
+        // This launcher exits immediately after spawning, so it can clear their
+        // inheritance before Rust creates the child's separate null handles.
+        for id in [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE] {
+            // SAFETY: only read and change inheritance of our standard handles.
+            unsafe {
+                let handle = GetStdHandle(id);
+                if !handle.is_null()
+                    && handle != INVALID_HANDLE_VALUE
+                    && SetHandleInformation(handle, HANDLE_FLAG_INHERIT, 0) == 0
+                {
+                    return Err(io::Error::last_os_error());
+                }
+            }
+        }
         const DETACHED_PROCESS: u32 = 0x00000008;
         const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
         command.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
@@ -87,15 +108,25 @@ mod tests {
             panic!("Launcher waited for the GUI process");
         }
         assert!(status.unwrap().success());
-        // Inherited output pipes would keep this call blocked until the GUI exits.
-        assert!(launcher.wait_with_output().unwrap().status.success());
         wait_for(&directory.path().join("ready"));
         let observed: serde_json::Value =
             serde_json::from_slice(&std::fs::read(directory.path().join("ready")).unwrap())
                 .unwrap();
+        // Bound pipe reads separately from process exit: inherited Windows
+        // handles can keep them open even after the launcher has exited.
+        let (send, receive) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = send.send(launcher.wait_with_output());
+        });
+        let output = receive.recv_timeout(Duration::from_secs(3));
         // Stop the child before assertions so failures also clean it up.
         std::fs::write(directory.path().join("stop"), "").unwrap();
         wait_for(&directory.path().join("done"));
+        assert!(output
+            .expect("GUI inherited the launcher's output pipes")
+            .unwrap()
+            .status
+            .success());
         assert_eq!(observed["args"], serde_json::json!(args));
         assert_eq!(
             std::fs::canonicalize(observed["cwd"].as_str().unwrap()).unwrap(),

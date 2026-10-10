@@ -1293,6 +1293,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tempfile",
  "wait-timeout",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
