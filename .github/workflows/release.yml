@@ -181,7 +181,6 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           NO_STRIP: "true"
           APPIMAGE_EXTRACT_AND_RUN: "1"
-          LDAI_COMP: gzip
         with:
           releaseId: ${{ needs.prepare.outputs.release_id }}
           tagName: ${{ needs.prepare.outputs.tag }}
