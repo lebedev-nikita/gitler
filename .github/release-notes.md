@@ -1,11 +1,13 @@
-Gitler 0.3.4 combines manual branch renaming and AI suggestions in one dialog.
+Gitler 0.4.0 adds media previews to the right-hand inspector.
 
 ## Changes
 
-- Choose **Rename branch…** from a local branch's context menu and edit its current name immediately, without requiring Codex.
-- Use the **Generate with AI** sparkle icon beside the name field to suggest a name from the selected branch's commits and working changes. Review or edit the suggestion before applying it.
-- Keep typed names when generation fails, cancel pending Codex requests when closing the dialog, and reject renames if the branch has moved.
-- Preserve merged-branch cleanup, selected-file discards, upstream settings, and remote branch names.
+- Preview images, video, and audio directly in the inspector, with labeled Before and After versions.
+- Inspect the selected commit, staged contents, or working copy, including renamed and deleted media files.
+- See image dimensions and file sizes, and play video and audio with native controls.
+- Keep playback stable during background repository scans. Files above 16 MiB and unsupported formats show an unavailable-preview message.
+- Refresh the application icon and toolbar, and match the interface palette to the charcoal, cream, and red icon.
+- Add local browser development and pre-release checks.
 
 ## Downloads
 
