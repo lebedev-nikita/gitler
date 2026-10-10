@@ -1,8 +1,10 @@
 pub mod git;
+mod windows;
 
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::{Emitter, Manager};
+use windows::RepositoryWindows;
 
 #[derive(Default)]
 struct LaunchPath(Mutex<Option<String>>);
@@ -35,8 +37,27 @@ pub fn cli_path(args: &[String], cwd: &Path) -> Result<Option<String>, String> {
 }
 
 #[tauri::command]
-fn launch_path(state: tauri::State<LaunchPath>) -> Option<String> {
+fn launch_path(
+    window: tauri::WebviewWindow,
+    repositories: tauri::State<RepositoryWindows>,
+    state: tauri::State<LaunchPath>,
+) -> Option<String> {
+    if let Some(path) = repositories.path(window.label()) {
+        return Some(path);
+    }
+    if window.label() != "main" {
+        return None;
+    }
     state.0.lock().ok().and_then(|mut value| value.take())
+}
+
+#[tauri::command]
+async fn open_repository(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    path: String,
+) -> Result<Option<String>, String> {
+    windows::open(app, path, Some(window.label().to_string())).await
 }
 
 #[tauri::command]
@@ -99,21 +120,40 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
             if let Ok(Some(path)) = cli_path(&args, Path::new(&cwd)) {
-                if let Ok(mut pending) = app.state::<LaunchPath>().0.lock() {
-                    *pending = Some(path.clone());
-                }
-                let _ = app.emit("repository-open", path);
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(error) = windows::open(app.clone(), path.clone(), None).await {
+                        eprintln!("Could not open repository: {error}");
+                        if let Some(window) = windows::active_window(&app) {
+                            let _ = window.emit("repository-open", path);
+                            let _ = windows::focus(&window);
+                        }
+                    }
+                });
+                return;
             }
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.unminimize();
-                let _ = window.show();
-                let _ = window.set_focus();
+            if let Some(window) = windows::active_window(app) {
+                let _ = windows::focus(&window);
             }
         }))
         .plugin(tauri_plugin_dialog::init())
-        .manage(LaunchPath(Mutex::new(initial)))
+        .manage(LaunchPath(Mutex::new(initial.clone())))
+        .manage(RepositoryWindows::default())
+        .setup(move |app| {
+            if let Some(path) = &initial {
+                // Invalid paths are reported by the window's normal open dialog.
+                let _ = windows::initialize(app.handle(), path);
+            }
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                window.state::<RepositoryWindows>().closed(window.label());
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             launch_path,
+            open_repository,
             repository_snapshot,
             commit_detail,
             worktree_detail,

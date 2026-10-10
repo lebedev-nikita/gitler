@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
   AlertTriangle,
@@ -51,7 +50,7 @@ function savedPath() {
 
 export default function App() {
   const queryClient = useQueryClient();
-  const [path, setPath] = useState<string | null>(desktop ? savedPath() : DEMO_PATH);
+  const [path, setPath] = useState<string | null>(desktop ? null : DEMO_PATH);
   const [limit, setLimit] = useState(400);
   const [selected, setSelected] = useState<Selection | null>(null);
   const [comparison, setComparison] = useState<Comparison | null>(null);
@@ -67,6 +66,7 @@ export default function App() {
   const searchRef = useRef<HTMLInputElement>(null);
   const lastRepository = useRef<string | null>(null);
   const requestSequence = useRef(0);
+  const loadedPath = useRef<string | null>(null);
   const repository = useQuery({
     queryKey: ["repository", path, limit],
     queryFn: () => repositoryApi.snapshot(path!, limit),
@@ -95,13 +95,20 @@ export default function App() {
       setOpening(true);
       setOpenError(null);
       try {
+        const target = await repositoryApi.open(requested);
+        if (sequence !== requestSequence.current) return;
+        if (target === null || target === loadedPath.current) {
+          setOpenDialog(false);
+          return;
+        }
         const result = await queryClient.fetchQuery({
-          queryKey: ["repository", requested, 400],
-          queryFn: () => repositoryApi.snapshot(requested, 400),
+          queryKey: ["repository", target, 400],
+          queryFn: () => repositoryApi.snapshot(target, 400),
           staleTime: 0,
         });
         if (sequence !== requestSequence.current) return;
-        setPath(requested);
+        loadedPath.current = target;
+        setPath(target);
         setLimit(400);
         setComparison(null);
         setOpenDialog(false);
@@ -145,16 +152,27 @@ export default function App() {
   useEffect(() => {
     if (!desktop) return;
     let disposed = false;
-    const unsubscribe = listen<string>("repository-open", (event) => {
-      void openRepository(event.payload);
+    const unsubscribe = getCurrentWebviewWindow().listen<string>("repository-open", (event) => {
+      if (!disposed) void openRepository(event.payload);
     });
-    void unsubscribe.then(async () => {
-      const initial = await invoke<string | null>("launch_path");
-      if (!disposed && initial) void openRepository(initial);
-    });
+    void unsubscribe
+      .then(async () => {
+        if (disposed) return;
+        const initial = (await repositoryApi.launchPath()) ?? savedPath();
+        if (!disposed && initial) void openRepository(initial);
+      })
+      .catch((error: unknown) => {
+        if (!disposed) {
+          setOpenError(error);
+          setOpenDialog(true);
+        }
+      });
     return () => {
       disposed = true;
-      void unsubscribe.then((unlisten) => unlisten());
+      void unsubscribe.then(
+        (unlisten) => unlisten(),
+        () => undefined,
+      );
     };
   }, [openRepository]);
 
@@ -413,8 +431,8 @@ export default function App() {
           <DialogHeader>
             <DialogTitle>Open repository</DialogTitle>
             <DialogDescription>
-              Choose the repository or any of its working copies. Gitler opens the entire
-              repository.
+              Choose a repository or any of its working copies. Each repository opens in its own
+              window. Already open repositories are brought to the front.
             </DialogDescription>
           </DialogHeader>
           <form

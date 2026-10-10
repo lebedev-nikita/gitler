@@ -15,6 +15,8 @@ TypeScript, and shadcn/ui.
 - Compares two commits or a commit and a worktree's current files: select one node,
   right-click another, and choose **Diff with selected**. The diff opens on the right.
 - Filters and searches loaded history; loads older commits on demand.
+- Opens different repositories in separate windows, with at most one window per
+  repository, including all of its worktrees.
 
 The interface keeps the graph and a right-hand diff panel. Branches live in graph
 labels; filters appear only when you open **Filters**. To inspect or compare a
@@ -49,8 +51,9 @@ bun run tauri dev -- /path/to/any/worktree
 ```
 
 Build the desktop application with `bun run tauri build`. The compiled executable
-accepts `gitler /path/to/repository` or `gitler /path/to/worktree`. Launching it
-again opens the requested repository in the existing window.
+accepts `gitler /path/to/repository` or `gitler /path/to/worktree`. Each repository
+opens in its own window. Opening an already open repository or any of its
+worktrees brings that window to the front and preserves your selection.
 
 For a local release build, run `src-tauri/target/release/gitler .` from this
 project, or put that executable on your PATH to use `gitler` from any folder.

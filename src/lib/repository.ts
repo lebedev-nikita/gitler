@@ -136,6 +136,20 @@ const loadDiff = Effect.fn("loadDiff")(function* (request: DiffRequest) {
 });
 
 export const repositoryApi = {
+  open: (path: string): Promise<string | null> => {
+    if (!desktop) return Promise.resolve(path);
+    return runtime.runPromise(
+      GitTransport.use((transport) => transport.call("open_repository", { path })).pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(Schema.NullOr(Schema.String))),
+      ),
+    );
+  },
+  launchPath: (): Promise<string | null> =>
+    runtime.runPromise(
+      GitTransport.use((transport) => transport.call("launch_path", {})).pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(Schema.NullOr(Schema.String))),
+      ),
+    ),
   snapshot: (path: string, limit: number): Promise<Snapshot> =>
     runtime.runPromise(loadSnapshot(path, limit)),
   detail: (common: string, selection: Selection, comparison: Comparison | null): Promise<Detail> =>

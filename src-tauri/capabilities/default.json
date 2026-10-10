@@ -2,6 +2,6 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Local repository inspection and folder selection",
-  "windows": ["main"],
+  "windows": ["main", "repository-*"],
   "permissions": ["core:default", "dialog:allow-open"]
 }

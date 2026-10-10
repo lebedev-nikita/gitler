@@ -1,12 +1,15 @@
 Gitler is a read-only desktop Git graph for repositories with many branches and working copies.
 
-This is the first release candidate for 0.2.0.
+This is the second release candidate for 0.2.0.
 
 ## Changes
 
 - Hide T3 Code checkpoints from the commit graph and hash navigation. Checkpoints remain available to T3 Code for restoring files.
 - Keep checkpoint snapshots out of history limits while preserving every registered worktree, including detached HEADs.
-- Simplify launch instructions: run `gitler /path/to/repository` to open a repository in the existing window.
+- Open different repositories in separate windows from the GUI or CLI, with at most one window per repository.
+- Bring an already open repository to the front without resetting its selection or diff. Paths through worktrees, nested folders, and symlinks reuse the same window.
+- Show the repository name in each window's title.
+- Fix Windows MSI packaging for release candidates by using a numeric installer version.
 
 ## Downloads
 
