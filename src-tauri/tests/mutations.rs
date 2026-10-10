@@ -337,6 +337,84 @@ fn branch_context_contains_branch_commits_and_only_its_working_changes() {
 }
 
 #[test]
+fn branch_context_truncates_large_committed_patches() {
+    let contents = "large committed change\n".repeat(800_000);
+    assert!(contents.len() > 16 * 1024 * 1024);
+    // Exercise a branch diff, the fallback tip diff, and a root commit's show.
+    for (branch, amend) in [("agent/work", false), ("main", false), ("main", true)] {
+        let directory = repo();
+        let root = directory.path().to_str().unwrap();
+        if branch != "main" {
+            run(directory.path(), &["switch", "-c", branch]);
+        }
+        fs::write(directory.path().join("large.txt"), &contents).unwrap();
+        run(directory.path(), &["add", "large.txt"]);
+        let mut args = vec!["commit", "-m", "Implement large feature"];
+        if amend {
+            args.push("--amend");
+        }
+        run(directory.path(), &args);
+        let head = run(directory.path(), &["rev-parse", "HEAD"]);
+        let index = fs::read(directory.path().join(".git/index")).unwrap();
+
+        let context = git::branch_context(root, branch, Some(root)).unwrap();
+        assert_eq!(context.head, head);
+        assert!(context.text.contains("Implement large feature"));
+        assert!(context.text.contains("large committed change"));
+        assert!(context.text.contains("[Committed patch truncated]"));
+        assert!(context.text.len() < 256 * 1024);
+        assert_eq!(run(directory.path(), &["branch", "--show-current"]), branch);
+        assert!(run(directory.path(), &["status", "--porcelain"]).is_empty());
+        assert_eq!(
+            fs::read(directory.path().join(".git/index")).unwrap(),
+            index
+        );
+        assert_eq!(
+            fs::read_to_string(directory.path().join("large.txt")).unwrap(),
+            contents
+        );
+    }
+}
+
+#[test]
+fn branch_context_truncates_large_commit_messages() {
+    let directory = repo();
+    let root = directory.path().to_str().unwrap();
+    run(directory.path(), &["switch", "-c", "agent/work"]);
+    let message = directory.path().join(".git/large-message.txt");
+    fs::write(
+        &message,
+        format!(
+            "Implement feature\n\n{}",
+            "commit details\n".repeat(1_200_000)
+        ),
+    )
+    .unwrap();
+    run(
+        directory.path(),
+        &["commit", "--allow-empty", "-F", message.to_str().unwrap()],
+    );
+    let context = git::branch_context(root, "agent/work", Some(root)).unwrap();
+    assert!(context.text.contains("Implement feature"));
+    assert!(context.text.contains("commit details"));
+    assert!(context.text.contains("[Commit messages truncated]"));
+    assert!(!context.text.contains("[Committed patch truncated]"));
+    assert!(context.text.len() < 80 * 1024);
+}
+
+#[test]
+fn branch_context_preserves_git_errors_when_reading_truncated_output() {
+    let directory = repo();
+    let root = directory.path().to_str().unwrap();
+    run(
+        directory.path(),
+        &["config", "diff.algorithm", "invalid-algorithm"],
+    );
+    let error = git::branch_context(root, "main", Some(root)).unwrap_err();
+    assert!(error.contains("invalid-algorithm"), "{error}");
+}
+
+#[test]
 fn restoring_a_rename_requires_selecting_separate_changes_at_its_source() {
     let directory = repo();
     let root = directory.path().to_str().unwrap();

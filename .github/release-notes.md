@@ -1,10 +1,9 @@
-Gitler 0.2.2 keeps automatic repository refreshes quiet and preserves the loaded diff.
+Gitler 0.2.3 fixes branch-name generation when a branch contains large changes.
 
 ## Changes
 
-- Automatic scans no longer animate the refresh button, show a refreshing message, or put history controls into a loading state.
-- Keep the loaded file list and diff visible while rechecking them in the background. Updated file contents still appear even when Git statuses have not changed.
-- Manual refreshes from the toolbar or keyboard shortcut continue to show progress. Switching files or diff modes retains the appropriate loading state, and refresh errors remain visible.
+- Branch-name generation no longer fails with “Git output exceeds 16 MiB” for large committed patches or commit messages. Oversized context is shortened before being sent to Codex.
+- Git failures still appear as errors, and generating a name leaves repository files and the index unchanged.
 
 ## Downloads
 
