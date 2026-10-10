@@ -92,6 +92,10 @@ Git inspection lives in `src-tauri/src/git.rs`; the React interface is in `src/`
 Version tags such as `v0.1.0` trigger the desktop release workflow. It tests and
 builds all six platform variants, attaches installers and SHA-256 checksums to a
 draft release, and publishes only after every platform succeeds.
+After publication, it updates `Casks/gitler.rb` in the Homebrew tap and pushes the
+new version and both macOS archive checksums. The `HOMEBREW_TAP_TOKEN` Actions
+secret must contain a fine-grained token for `jeff-business/homebrew-tap` with
+`Contents: Read and write` permission.
 
 Pushes to `main` and pull requests test and package every platform without
 publishing. To measure the full build with a warmed cache, run

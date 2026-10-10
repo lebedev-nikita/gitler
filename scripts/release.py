@@ -89,7 +89,52 @@ def publish(tag):
     print(release(tag)["url"])
 
 
+def tap_cask(source, app_version, checksums):
+    hashes = {}
+    for arch in ("arm64", "x64"):
+        name = f"Gitler_{app_version}_macos-{arch}.app.tar.gz"
+        matches = re.findall(rf"^([0-9a-f]{{64}})  {re.escape(name)}$", checksums, re.M)
+        if len(matches) != 1:
+            raise SystemExit(f"Expected one SHA-256 checksum for {name}")
+        hashes[arch] = matches[0]
+    source, versions = re.subn(r'^  version "[^"\n]+"$', f'  version "{app_version}"', source, flags=re.M)
+    source, digests = re.subn(
+        r'^  sha256 arm: +"[0-9a-f]{64}",\n +intel: "[0-9a-f]{64}"$',
+        f'  sha256 arm:   "{hashes["arm64"]}",\n         intel: "{hashes["x64"]}"',
+        source,
+        flags=re.M,
+    )
+    if versions != 1 or digests != 1:
+        raise SystemExit("Unexpected version or architecture checksums in Casks/gitler.rb")
+    return source
+
+
+def update_tap(tag, directory):
+    app_version = version(tag)
+    if release(tag)["isDraft"]:
+        raise SystemExit("Publish the release before updating the Homebrew tap")
+    with tempfile.TemporaryDirectory(prefix="gitler-tap-") as downloads:
+        gh("release", "download", tag, "--dir", downloads, "--pattern", "SHA256SUMS.txt")
+        checksums = (Path(downloads) / "SHA256SUMS.txt").read_text()
+    cask = Path(directory) / "Casks/gitler.rb"
+    source = cask.read_text()
+    updated = tap_cask(source, app_version, checksums)
+    if updated != source:
+        cask.write_text(updated)
+        subprocess.run([
+            "git", "-C", str(directory),
+            "-c", "user.name=github-actions[bot]",
+            "-c", "user.email=41898282+github-actions[bot]@users.noreply.github.com",
+            "commit", "--only", "-m", f"Update Gitler to {app_version}", "--", "Casks/gitler.rb",
+        ], check=True)
+    # Also retry a push that failed after the cask commit was created.
+    subprocess.run(["git", "-C", str(directory), "push", "origin", "HEAD:main"], check=True)
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 3 or sys.argv[1] not in {"prepare", "publish"}:
-        raise SystemExit("Usage: release.py prepare|publish VERSION_TAG")
-    {"prepare": prepare, "publish": publish}[sys.argv[1]](sys.argv[2])
+    if len(sys.argv) == 4 and sys.argv[1] == "update-tap":
+        update_tap(sys.argv[2], sys.argv[3])
+    elif len(sys.argv) == 3 and sys.argv[1] in {"prepare", "publish"}:
+        {"prepare": prepare, "publish": publish}[sys.argv[1]](sys.argv[2])
+    else:
+        raise SystemExit("Usage: release.py prepare|publish VERSION_TAG | update-tap VERSION_TAG TAP_DIRECTORY")
