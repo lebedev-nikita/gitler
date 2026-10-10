@@ -55,13 +55,13 @@ def prepare(root: Path):
     for path in files:
         if path == root / "scripts/native_ci_cache.py":
             continue
-        os.utime(path, (SOURCE_MTIME, SOURCE_MTIME), follow_symlinks=False)
+        os.utime(path, (SOURCE_MTIME, SOURCE_MTIME))
         parent = path.parent
         while parent != root:
             directories.add(parent)
             parent = parent.parent
     for directory in sorted(directories, key=lambda path: len(path.parts), reverse=True):
-        os.utime(directory, (SOURCE_MTIME, SOURCE_MTIME), follow_symlinks=False)
+        os.utime(directory, (SOURCE_MTIME, SOURCE_MTIME))
     return reused
 
 
