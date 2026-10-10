@@ -1,13 +1,9 @@
-Gitler 0.4.0 adds media previews to the right-hand inspector.
+Gitler 0.4.1 fixes the window title bar background.
 
 ## Changes
 
-- Preview images, video, and audio directly in the inspector, with labeled Before and After versions.
-- Inspect the selected commit, staged contents, or working copy, including renamed and deleted media files.
-- See image dimensions and file sizes, and play video and audio with native controls.
-- Keep playback stable during background repository scans. Files above 16 MiB and unsupported formats show an unavailable-preview message.
-- Refresh the application icon and toolbar, and match the interface palette to the charcoal, cream, and red icon.
-- Add local browser development and pre-release checks.
+- Match the native title bar to the toolbar's charcoal background in every repository window.
+- Check the native background against the toolbar's CSS color during tests and production builds, preventing palette changes from leaving the title bar behind.
 
 ## Downloads
 
