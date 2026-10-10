@@ -1,8 +1,13 @@
 # Icon provenance
 
-All four bundle icons were rasterized from the repository's existing
-`assets/icon.svg` using the official Tauri icon command. The source was present
-in initial commit `d67e6ecfc09f5eed74a6ca6d0126de90f3808251`.
+All four bundle icons were generated from the user-provided
+[`assets/icons/base.png`](../../assets/icons/base.png), retaining the Gitler
+wordmark, with the official Tauri CLI:
 
-The PNG files embed this origin in their metadata. The ICNS container
-derives from the same source. No generative prompt was used.
+```sh
+bun run tauri icon assets/icons/base.png --output /tmp/gitler-app-icons
+```
+
+The bundle uses `32x32.png`, `128x128.png`, `128x128@2x.png`, and `icon.icns`
+from that output. See [source provenance](../../assets/icons/PROVENANCE.md)
+for the separate text-free variant and its generation prompts.

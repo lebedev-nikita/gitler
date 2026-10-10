@@ -1,4 +1,4 @@
-<img src="assets/icon.svg" width="48" height="48" alt="Gitler">
+<img src="assets/icons/base.png" width="48" height="48" alt="Gitler">
 
 # Gitler
 
