@@ -9,6 +9,7 @@ const badgeVariants = cva(
     variants: {
       variant: {
         dirty: "border-dirty/25 bg-dirty/10 text-dirty",
+        integrated: "border-primary/25 bg-primary/10 text-primary",
         branch:
           "border-[color-mix(in_srgb,var(--ref-color,var(--primary)),transparent_65%)] bg-[color-mix(in_srgb,var(--ref-color,var(--primary)),transparent_92%)] text-[var(--ref-color,var(--primary))]",
         tag: "border-tag/25 bg-tag/10 text-tag",

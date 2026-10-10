@@ -1,10 +1,11 @@
-Gitler 0.3.1 keeps the main branch at the left edge of the commit graph.
+Gitler 0.3.2 makes branches whose changes reached main through squash or rebase clearly identifiable.
 
 ## Changes
 
-- Pin `main` or `master` and its first-parent history to the leftmost graph lane, even when other branches have newer commits.
-- Keep mainline working changes on the same lane and preserve the position when searching or filtering history.
-- Preserve connections to older mainline commits when drawing branches and merges.
+- Show **Changes in main** when all committed changes match the main branch after squash, rebase, or cherry-pick.
+- Show **Merged into main** for branches already contained in the main branch's commit history.
+- Preserve the real commit connections and keep uncommitted work visible separately.
+- Detect multi-commit squash merges and matching commits outside the loaded graph page without accessing GitHub or changing repository files.
 
 ## Downloads
 
