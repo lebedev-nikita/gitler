@@ -267,11 +267,23 @@ export default function App() {
         event.preventDefault();
         void refreshRepository();
       }
+      if (
+        event.metaKey &&
+        event.altKey &&
+        !event.ctrlKey &&
+        !event.shiftKey &&
+        event.code === "KeyB" &&
+        snapshot &&
+        selected
+      ) {
+        event.preventDefault();
+        if (!event.repeat) setInspectorOpen((value) => !value);
+      }
       if (!editing && event.key === "?" && !openDialog && !infoDialog) setShortcutsDialog(true);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [refreshRepository, openDialog, infoDialog]);
+  }, [refreshRepository, openDialog, infoDialog, snapshot, selected, setInspectorOpen]);
 
   const compare = (other: Selection) => {
     if (
@@ -359,7 +371,8 @@ export default function App() {
           variant="ghost"
           size="icon-sm"
           aria-label={inspectorOpen ? "Hide details panel" : "Show details panel"}
-          title={inspectorOpen ? "Hide details panel" : "Show details panel"}
+          title={inspectorOpen ? "Hide details panel (⌘⌥B)" : "Show details panel (⌘⌥B)"}
+          aria-keyshortcuts="Meta+Alt+B"
           aria-expanded={inspectorOpen && !!selected}
           disabled={!snapshot || !selected}
           onClick={() => setInspectorOpen((value) => !value)}
@@ -847,6 +860,12 @@ export default function App() {
               <span>Refresh</span>
               <kbd className="text-muted-foreground text-[10px] bg-secondary py-[4px] px-[6px] rounded-[4px]">
                 ⌘ / Ctrl R
+              </kbd>
+            </div>
+            <div className="flex items-center justify-between gap-[12px]">
+              <span>Toggle details panel</span>
+              <kbd className="text-muted-foreground text-[10px] bg-secondary py-[4px] px-[6px] rounded-[4px]">
+                ⌘⌥B
               </kbd>
             </div>
             <div className="flex items-center justify-between gap-[12px]">
