@@ -71,9 +71,11 @@ pub struct Stash {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Remote {
     pub name: String,
     pub url: String,
+    pub web_url: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -166,6 +168,11 @@ fn execute_with_output_policy(
         OutputPolicy::Complete => OUTPUT_LIMIT,
         OutputPolicy::Truncate(limit) => limit,
     };
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
     let mut child = command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -200,6 +207,16 @@ fn execute_with_output_policy(
         .wait_timeout(Duration::from_secs(30))
         .map_err(|error| error.to_string())?;
     if status.is_none() {
+        #[cfg(unix)]
+        unsafe {
+            libc::kill(-(child.id() as i32), libc::SIGKILL);
+        }
+        #[cfg(windows)]
+        {
+            let _ = Command::new("taskkill")
+                .args(["/PID", &child.id().to_string(), "/T", "/F"])
+                .output();
+        }
         let _ = child.kill();
         let _ = child.wait();
     }
@@ -207,7 +224,8 @@ fn execute_with_output_policy(
     let errors = err.join().map_err(|_| "Git error reader failed")?;
     let Some(status) = status else {
         return Err(
-            "Git scan took longer than 30 seconds. Try a smaller repository or refresh.".into(),
+            "Git operation took longer than 30 seconds. Check the repository or network and retry."
+                .into(),
         );
     };
     if !status.success() && !(allow_difference && status.code() == Some(1)) {
@@ -409,6 +427,143 @@ fn log_commits(common: &Path, worktrees: &[Worktree], limit: usize) -> Result<Ve
         .collect())
 }
 
+/// Convert network Git transports to a browser URL without credentials or SSH ports.
+pub fn remote_web_url(address: &str) -> Option<String> {
+    if address
+        .chars()
+        .any(|ch| ch.is_whitespace() || ch.is_control())
+    {
+        return None;
+    }
+    let address = if address.contains("://") {
+        address.to_string()
+    } else {
+        let (host, path) = address.split_once(':')?;
+        if host.contains('/') || host.contains('\\') || !host.contains('.') {
+            return None;
+        }
+        format!("ssh://{host}/{path}")
+    };
+    let mut url = tauri::Url::parse(&address).ok()?;
+    match url.scheme() {
+        "http" | "https" => {}
+        "ssh" | "git" => {
+            let host = url.host_str()?;
+            let host = if host == "ssh.github.com" {
+                "github.com"
+            } else {
+                host
+            };
+            let mut web = tauri::Url::parse(&format!("https://{host}")).ok()?;
+            web.set_path(url.path());
+            url = web;
+        }
+        _ => return None,
+    }
+    url.host_str()?;
+    let path = url
+        .path()
+        .trim_end_matches('/')
+        .trim_end_matches(".git")
+        .to_string();
+    if path.is_empty() || path == "/" {
+        return None;
+    }
+    url.set_path(&path);
+    url.set_username("").ok()?;
+    url.set_password(None).ok()?;
+    url.set_query(None);
+    url.set_fragment(None);
+    Some(url.into())
+}
+
+fn remotes(common: &Path) -> Result<Vec<Remote>, String> {
+    let names = string(&in_repo(common, &["remote"])?);
+    names
+        .lines()
+        .map(|name| {
+            let url = string(&in_repo(common, &["remote", "get-url", "--", name])?)
+                .trim()
+                .to_string();
+            Ok(Remote {
+                name: name.into(),
+                web_url: remote_web_url(&url),
+                url,
+            })
+        })
+        .collect()
+}
+
+pub fn remote_url(common_dir: &str, name: &str) -> Result<String, String> {
+    let common = validate_common(common_dir)?;
+    remotes(&common)?
+        .into_iter()
+        .find(|remote| remote.name == name)
+        .ok_or("This remote is no longer configured. Refresh the repository.")?
+        .web_url
+        .ok_or_else(|| "This remote has no supported web address.".into())
+}
+
+/// Only remote-tracking branches may change; ignore configured destination refspecs.
+pub fn fetch_remotes(common_dir: &str) -> Result<(), String> {
+    let common = validate_common(common_dir)?;
+    let trees = parse_worktrees(&in_repo(
+        &common,
+        &["worktree", "list", "--porcelain", "-z"],
+    )?);
+    let root = trees
+        .first()
+        .map(|tree| Path::new(&tree.path))
+        .filter(|path| path.is_dir())
+        .unwrap_or(&common);
+    let mut errors = Vec::new();
+    for remote in remotes(&common)? {
+        let refspec = format!("+refs/heads/*:refs/remotes/{}/*", remote.name);
+        let mut command = git_command();
+        if std::env::var_os("GIT_SSH_COMMAND").is_none()
+            && std::env::var_os("GIT_SSH").is_none()
+            && in_repo(&common, &["config", "--get", "core.sshCommand"]).is_err()
+        {
+            command.args([
+                "-c",
+                "core.sshCommand=ssh -oBatchMode=yes -oConnectTimeout=10",
+            ]);
+        }
+        command
+            .arg("--git-dir")
+            .arg(&common)
+            .args([
+                "-c",
+                "credential.interactive=false",
+                "fetch",
+                "--no-tags",
+                "--no-prune",
+                "--no-prune-tags",
+                "--no-write-fetch-head",
+                "--no-recurse-submodules",
+                "--no-auto-maintenance",
+                "--refmap=",
+                "--",
+                &remote.name,
+                &refspec,
+            ])
+            .current_dir(root)
+            .stdin(Stdio::null())
+            .env("GIT_ASKPASS", "")
+            .env("SSH_ASKPASS_REQUIRE", "never");
+        if let Err(error) = execute(command) {
+            errors.push(format!("{}: {error}", remote.name));
+        }
+    }
+    if errors.is_empty() {
+        return Ok(());
+    }
+    Err(format!(
+        "Could not update remotes. Check your network and Git authentication.\n{}",
+        errors.join("\n")
+    ))
+}
+
 pub fn snapshot(path: &str, limit: usize) -> Result<Snapshot, String> {
     let common = resolve_common(path)?;
     let limit = limit.clamp(50, 20000);
@@ -521,18 +676,7 @@ pub fn snapshot(path: &str, limit: usize) -> Result<Snapshot, String> {
             })
         })
         .collect();
-    let names = string(&in_repo(&common, &["remote"])?);
-    let remotes = names
-        .lines()
-        .filter_map(|name| {
-            in_repo(&common, &["remote", "get-url", name])
-                .ok()
-                .map(|url| Remote {
-                    name: name.into(),
-                    url: string(&url).trim().into(),
-                })
-        })
-        .collect();
+    let remotes = remotes(&common)?;
     let root = worktrees
         .first()
         .map(|tree| tree.path.clone())

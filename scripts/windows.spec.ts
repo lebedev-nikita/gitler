@@ -43,6 +43,7 @@ test("opening another repository or the current worktree preserves this window's
           if (path === "/invalid") throw "Not a Git repository";
           return path === "/other" ? null : "/current/.git";
         }
+        if (command === "fetch_remotes") return null;
         if (command === "repository_snapshot") return snapshot;
         throw new Error(`Unexpected IPC command: ${command}`);
       },

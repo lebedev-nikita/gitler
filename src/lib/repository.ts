@@ -159,6 +159,10 @@ const action = Effect.fn("repositoryAction")(function* <A, I>(
 });
 
 export const repositoryApi = {
+  fetchRemotes: (commonDir: string) =>
+    runtime.runPromise(action(commonDir, "fetch_remotes", {}, Schema.Null)),
+  openRemote: (commonDir: string, name: string) =>
+    runtime.runPromise(action(commonDir, "open_remote", { name }, Schema.Null)),
   generateBranchName: (
     commonDir: string,
     branch: string,

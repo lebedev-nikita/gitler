@@ -135,7 +135,13 @@ export function demoSnapshot(): Snapshot {
         timestamp: 1791540000,
       },
     ],
-    remotes: [{ name: "origin", url: "git@github.com:example/gitler.git" }],
+    remotes: [
+      {
+        name: "origin",
+        url: "git@github.com:example/gitler.git",
+        webUrl: "https://github.com/example/gitler",
+      },
+    ],
     hasMore: false,
     scannedAt: Math.floor(Date.now() / 1000),
   };

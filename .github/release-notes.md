@@ -1,12 +1,11 @@
-Gitler 0.2.4 adds resizable panels and controls for hiding details and the diff preview.
+Gitler 0.3.0 tracks remote branches automatically and opens remote repositories from the app.
 
 ## Changes
 
-- Resize the graph and details panels by dragging their boundary. Resize the changed-file list and diff preview independently.
-- Hide or reopen the details panel from the toolbar, and toggle the diff preview beside the changed-file heading.
-- Panel sizes and visibility are remembered. Hiding details preserves the selected file and changes view; selecting another graph node respects hidden panels.
-- Remove the auto-refresh toggle from the status bar. Background refresh continues every 15 seconds without showing a loading spinner.
-- Publish the updated Homebrew cask automatically after the release downloads are verified.
+- Fetch remote branches when a repository opens and every minute in the background. New commits and branches appear in the graph without changing local branches, tags, indexes, or working files.
+- Open the primary remote from the toolbar, and open any supported remote from repository information. GitHub HTTPS and SSH addresses resolve to browser links.
+- Show remote update progress, the last successful update, and network or authentication failures in the status bar. Retry from repository information or use Refresh.
+- Preserve the last fetched history when offline. Git authentication remains managed by your existing Git setup.
 
 ## Downloads
 

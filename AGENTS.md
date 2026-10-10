@@ -1,9 +1,10 @@
 # Gitler
 
 Git operations live in `src-tauri/src/git.rs`. Resolve repositories by their common
-Git directory, including every registered worktree. Inspection stays read-only;
-mutations are limited to explicit local branch renames and confirmed, selected-file
-discards. Validate repository ownership and stale previews before changing files.
+Git directory, including every registered worktree. Snapshot inspection stays read-only. Background fetches may update only remote-tracking
+branches; preserve local branches, tags, indexes, and working files regardless of
+configured fetch refspecs. Other mutations are limited to explicit local branch
+renames and confirmed, selected-file discards. Validate repository ownership and stale previews before changing files.
 
 # Learning more about Effect
 

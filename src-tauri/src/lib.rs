@@ -70,6 +70,40 @@ async fn repository_snapshot(path: String, limit: usize) -> Result<git::Snapshot
 }
 
 #[tauri::command]
+async fn fetch_remotes(common_dir: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || git::fetch_remotes(&common_dir))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn open_remote(common_dir: String, name: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let url = git::remote_url(&common_dir, &name)?;
+        #[cfg(target_os = "macos")]
+        let mut command = std::process::Command::new("open");
+        #[cfg(target_os = "windows")]
+        let mut command = {
+            let mut command = std::process::Command::new("rundll32.exe");
+            command.arg("url.dll,FileProtocolHandler");
+            command
+        };
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        let mut command = std::process::Command::new("xdg-open");
+        let status = command
+            .arg(url)
+            .status()
+            .map_err(|error| format!("Could not open browser: {error}"))?;
+        if status.success() {
+            return Ok(());
+        }
+        Err("Could not open the default browser.".into())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 async fn commit_detail(
     common_dir: String,
     oid: String,
@@ -231,6 +265,8 @@ pub fn run() {
             launch_path,
             open_repository,
             repository_snapshot,
+            fetch_remotes,
+            open_remote,
             commit_detail,
             worktree_detail,
             resolve_commit,

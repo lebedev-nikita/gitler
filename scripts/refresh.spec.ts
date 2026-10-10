@@ -38,6 +38,7 @@ async function mockRefresh(page: Page) {
           if (command === "plugin:event|listen") return 1;
           if (command === "plugin:event|unlisten") return null;
           if (command === "launch_path" || command === "open_repository") return snapshot.path;
+          if (command === "fetch_remotes") return null;
           current.refresh.calls.push(command);
           if (current.refresh.held)
             await new Promise<void>((resolve) => {

@@ -21,6 +21,7 @@ async function mockDesktop(page: import("@playwright/test").Page, fail = false, 
           if (command === "plugin:event|listen") return 1;
           if (command === "plugin:event|unlisten") return null;
           if (command === "launch_path" || command === "open_repository") return snapshot.path;
+          if (command === "fetch_remotes") return null;
           if (command === "repository_snapshot") return snapshot;
           if (command === "worktree_detail" || command === "commit_detail")
             return {

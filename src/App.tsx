@@ -9,6 +9,8 @@ import {
   ChevronRight,
   Database,
   FolderOpen,
+  ExternalLink,
+  CloudDownload,
   GitBranch,
   GitCompareArrows,
   GitFork,
@@ -90,16 +92,57 @@ export default function App() {
     if (!data || resolved?.commonDir !== data.commonDir) return data;
     return { ...data, commits: mergeCommitHistory(data.commits, resolved.commits) };
   }, [repository.data, resolved]);
+  const remoteSync = useQuery({
+    queryKey: ["remote-sync", snapshot?.commonDir],
+    enabled: desktop && !!snapshot && !isDemo(snapshot.commonDir) && snapshot.remotes.length > 0,
+    queryFn: async () => {
+      try {
+        await repositoryApi.fetchRemotes(snapshot!.commonDir);
+        return null;
+      } finally {
+        await queryClient.invalidateQueries(
+          { queryKey: ["repository", path] },
+          { cancelRefetch: false },
+        );
+      }
+    },
+    refetchInterval: 60000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: false,
+    retry: false,
+    staleTime: 60000,
+  });
+  const [remoteOpenError, setRemoteOpenError] = useState<unknown>(null);
+  const primaryRemote =
+    snapshot?.remotes.find((remote) => remote.name === "origin" && remote.webUrl) ??
+    snapshot?.remotes.find((remote) => remote.webUrl);
+  const openRemote = async (name: string) => {
+    if (!snapshot) return;
+    setRemoteOpenError(null);
+    try {
+      await repositoryApi.openRemote(snapshot.commonDir, name);
+    } catch (error) {
+      setRemoteOpenError(error);
+      setInfoDialog(true);
+    }
+  };
   const refreshBusy = repository.isLoading || refreshing;
   const refreshRepository = useCallback(async () => {
     if (!path) return;
     setRefreshing(true);
     try {
-      await repository.refetch({ cancelRefetch: false });
+      if (
+        desktop &&
+        repository.data &&
+        !isDemo(repository.data.commonDir) &&
+        repository.data.remotes.length
+      )
+        await remoteSync.refetch({ cancelRefetch: false });
+      else await repository.refetch({ cancelRefetch: false });
     } finally {
       setRefreshing(false);
     }
-  }, [path, repository.refetch]);
+  }, [path, repository.data, repository.refetch, remoteSync.refetch]);
   const demo = !!snapshot && isDemo(snapshot.commonDir);
   const dirty = snapshot?.worktrees.filter((tree) => tree.files.length > 0 && !tree.error) ?? [];
   const unavailable = snapshot?.worktrees.filter((tree) => tree.error) ?? [];
@@ -167,6 +210,7 @@ export default function App() {
   useEffect(() => {
     if (!snapshot || lastRepository.current === snapshot.commonDir) return;
     lastRepository.current = snapshot.commonDir;
+    setRemoteOpenError(null);
     const firstDirty = snapshot.worktrees.find((tree) => tree.files.length > 0 && !tree.error);
     if (firstDirty) select({ kind: "worktree", path: firstDirty.path });
     else if (snapshot.commits[0]) select({ kind: "commit", oid: snapshot.commits[0].oid });
@@ -254,6 +298,27 @@ export default function App() {
           {snapshot?.name ?? "No repository"}
           <ChevronRight data-icon="inline-end" />
         </Button>
+        {primaryRemote && (
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={`Open ${primaryRemote.name} repository in browser`}
+            title={
+              demo
+                ? "Demo remote — open a local repository to use this action"
+                : primaryRemote.webUrl!
+            }
+            disabled={demo}
+            onClick={() => {
+              void openRemote(primaryRemote.name);
+            }}
+          >
+            <ExternalLink data-icon="inline-start" />
+            <span className="compact:hidden">
+              {new URL(primaryRemote.webUrl!).host === "github.com" ? "GitHub" : "Remote"}
+            </span>
+          </Button>
+        )}
         {demo && (
           <Badge className="compact:hidden" variant="outline">
             Demo
@@ -503,6 +568,25 @@ export default function App() {
                 : "Ready to open a repository"}
         </span>
         <div className="flex items-center gap-[10px] min-w-0">
+          {snapshot && !demo && snapshot.remotes.length > 0 && (
+            <button
+              className={cn(
+                "inline-flex items-center gap-[5px] flex-none",
+                remoteSync.isError && "text-destructive",
+              )}
+              onClick={() => setInfoDialog(true)}
+              title="Remote updates and repository information"
+            >
+              <CloudDownload className="size-[12px]" />
+              {remoteSync.isFetching
+                ? "Updating remotes…"
+                : remoteSync.isError
+                  ? "Remote update failed"
+                  : remoteSync.dataUpdatedAt
+                    ? `Remotes updated ${new Date(remoteSync.dataUpdatedAt).toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit" })}`
+                    : "Remote update pending"}
+            </button>
+          )}
           {snapshot && (
             <span className="font-mono truncate compact:hidden" title={snapshot.commonDir}>
               {shortPath(snapshot.path)}
@@ -642,10 +726,48 @@ export default function App() {
                 </div>
               ))}
               <h3 className="text-[12px] font-semibold mt-[24px] mx-0 mb-[10px]">Remotes</h3>
+              {!!remoteOpenError && (
+                <ErrorMessage title="Could not open remote" error={remoteOpenError} />
+              )}
+              {!demo && snapshot.remotes.length > 0 && (
+                <p className="text-muted-foreground text-[11px] mb-[10px]">
+                  Remote branches update automatically every minute. Working files and local
+                  branches stay unchanged.
+                </p>
+              )}
+              {remoteSync.isError && (
+                <ErrorMessage
+                  title="Could not update remotes"
+                  error={remoteSync.error}
+                  retry={() => {
+                    void remoteSync.refetch({ cancelRefetch: false });
+                  }}
+                />
+              )}
               {snapshot.remotes.length ? (
                 snapshot.remotes.map((remote) => (
-                  <div className="flex flex-col gap-[6px] text-[11px]" key={remote.name}>
-                    <strong>{remote.name}</strong>
+                  <div
+                    className="flex flex-col gap-[6px] text-[11px] py-[10px] border-b border-border"
+                    key={remote.name}
+                  >
+                    <div className="flex items-center justify-between gap-[8px]">
+                      <strong>{remote.name}</strong>
+                      {remote.webUrl && (
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          disabled={demo}
+                          title={remote.webUrl}
+                          aria-label={`Open ${remote.name} repository in browser`}
+                          onClick={() => {
+                            void openRemote(remote.name);
+                          }}
+                        >
+                          <ExternalLink data-icon="inline-start" />
+                          Open in browser
+                        </Button>
+                      )}
+                    </div>
                     <code className="text-muted-foreground text-[10px] wrap-anywhere">
                       {remote.url}
                     </code>

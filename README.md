@@ -16,6 +16,8 @@ TypeScript, and shadcn/ui.
   right-click another, and choose **Diff with selected**. The diff opens on the right.
 - Suggests local branch names with your installed Codex CLI, then lets you review and apply the rename.
 - Discards selected staged, unstaged, and untracked files in a chosen working copy after confirmation.
+- Fetches remote branches in the background and shows new commits without changing local work.
+- Opens GitHub and other supported remote repositories in your default browser.
 - Filters and searches loaded history; loads older commits on demand.
 - Opens different repositories in separate windows, with at most one window per
   repository, including all of its worktrees.
@@ -41,7 +43,17 @@ The suggested name is editable before applying a local rename; remote names are 
 Discarding restores selected files to HEAD in both the index and working copy.
 Selected untracked and newly added files are deleted permanently. Gitler verifies
 that the reviewed files and HEAD have not changed; submodules and nested repositories
-must be handled separately. Other Git mutations remain outside the application's scope.
+must be handled separately. Apart from background remote updates, other Git mutations
+remain outside the application's scope.
+
+Remote branches update when you open a repository and every minute afterward. Use
+**Refresh** to update them immediately. The status bar shows the last successful
+update or a failure; click it to inspect remote addresses and retry. Gitler uses
+your existing Git credentials. For private repositories, authenticate with Git
+outside the app first. Offline use keeps the last fetched history available.
+The toolbar opens `origin` (or another remote with a supported web address);
+repository information offers an opening action for each remote. Local-path
+remotes and SSH aliases without a web hostname have no browser link.
 
 ## Download
 

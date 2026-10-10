@@ -59,7 +59,13 @@ export const SnapshotSchema = Schema.Struct({
       timestamp: Schema.Number,
     }),
   ),
-  remotes: Schema.Array(Schema.Struct({ name: Schema.String, url: Schema.String })),
+  remotes: Schema.Array(
+    Schema.Struct({
+      name: Schema.String,
+      url: Schema.String,
+      webUrl: Schema.NullOr(Schema.String),
+    }),
+  ),
   hasMore: Schema.Boolean,
   scannedAt: Schema.Number,
 });
