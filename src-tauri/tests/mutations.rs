@@ -22,6 +22,7 @@ fn run(path: &Path, args: &[&str]) -> String {
 fn repo() -> TempDir {
     let directory = TempDir::new().unwrap();
     run(directory.path(), &["init", "-b", "main"]);
+    run(directory.path(), &["config", "core.autocrlf", "false"]);
     run(directory.path(), &["config", "user.name", "Test"]);
     run(
         directory.path(),
