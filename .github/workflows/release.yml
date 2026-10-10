@@ -158,7 +158,10 @@ jobs:
           name: frontend
           path: dist
       - name: Test native Git inspection
-        run: cargo test --release --locked --manifest-path src-tauri/Cargo.toml --target ${{ matrix.target }}
+        env:
+          # Match Tauri's default so native macOS helpers are reused by the build.
+          MACOSX_DEPLOYMENT_TARGET: "10.13"
+        run: cargo test --release --locked --manifest-path src-tauri/Cargo.toml --target ${{ matrix.target }} --config 'profile.release.package.gitler.opt-level=0'
       - name: Build and attach platform installers
         uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # action-v1.0.0
         env:
