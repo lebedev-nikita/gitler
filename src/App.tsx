@@ -63,6 +63,7 @@ export default function App() {
   const [opening, setOpening] = useState(false);
   const [openError, setOpenError] = useState<unknown>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [resolved, setResolved] = useState<{ commonDir: string; commits: Commit[] } | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const lastRepository = useRef<string | null>(null);
@@ -79,6 +80,16 @@ export default function App() {
     if (!data || resolved?.commonDir !== data.commonDir) return data;
     return { ...data, commits: mergeCommitHistory(data.commits, resolved.commits) };
   }, [repository.data, resolved]);
+  const refreshBusy = repository.isLoading || refreshing;
+  const refreshRepository = useCallback(async () => {
+    if (!path) return;
+    setRefreshing(true);
+    try {
+      await repository.refetch({ cancelRefetch: false });
+    } finally {
+      setRefreshing(false);
+    }
+  }, [path, repository.refetch]);
   const demo = !!snapshot && isDemo(snapshot.commonDir);
   const dirty = snapshot?.worktrees.filter((tree) => tree.files.length > 0 && !tree.error) ?? [];
   const unavailable = snapshot?.worktrees.filter((tree) => tree.error) ?? [];
@@ -194,13 +205,13 @@ export default function App() {
       }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "r") {
         event.preventDefault();
-        void repository.refetch();
+        void refreshRepository();
       }
       if (!editing && event.key === "?" && !openDialog && !infoDialog) setShortcutsDialog(true);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [repository.refetch, openDialog, infoDialog]);
+  }, [refreshRepository, openDialog, infoDialog]);
 
   const compare = (other: Selection) => {
     if (
@@ -250,12 +261,12 @@ export default function App() {
           size="icon-sm"
           aria-label="Refresh repository"
           title="Refresh (⌘/Ctrl R)"
-          disabled={!path || repository.isFetching}
+          disabled={!path || refreshBusy}
           onClick={() => {
-            void repository.refetch();
+            void refreshRepository();
           }}
         >
-          <RefreshCw className={repository.isFetching ? "spin" : undefined} />
+          <RefreshCw className={refreshBusy ? "spin" : undefined} />
         </Button>
         <Button
           variant="ghost"
@@ -353,7 +364,7 @@ export default function App() {
               compare={compare}
               comparison={comparison}
               act={setGraphAction}
-              busy={repository.isFetching}
+              busy={repository.isLoading}
               loadMore={() => setLimit((value) => Math.min(value + 1000, 20000))}
               searchRef={searchRef}
               jump={async (hash) => {
@@ -424,7 +435,7 @@ export default function App() {
       <footer className="app-statusbar">
         <span>
           <span className={`status-dot ${repository.isError ? "unavailable" : "connected"}`} />
-          {repository.isFetching
+          {refreshBusy
             ? "Refreshing repository…"
             : repository.isError
               ? "Refresh failed — showing the last available scan"

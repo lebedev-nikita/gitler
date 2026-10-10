@@ -1,11 +1,10 @@
-Gitler 0.2.1 adds branch naming with Codex and selective cleanup of working changes.
+Gitler 0.2.2 keeps automatic repository refreshes quiet and preserves the loaded diff.
 
 ## Changes
 
-- Right-click a local branch label, its tip commit, or a working-change node to generate a branch name from committed and uncommitted changes using your installed Codex CLI. Review or edit the suggestion before applying the local rename. Upstream configuration is preserved.
-- Discard selected uncommitted files from the graph's context menu. Restore staged and unstaged changes to HEAD, and delete selected untracked or newly added files after confirmation. Other files and worktrees are preserved.
-- Reject stale discard previews and branch tips. Keep nested repositories and submodules out of destructive cleanup.
-- Cancel an in-progress Codex generation when its dialog closes. Detect common Codex installation paths, with an optional executable override.
+- Automatic scans no longer animate the refresh button, show a refreshing message, or put history controls into a loading state.
+- Keep the loaded file list and diff visible while rechecking them in the background. Updated file contents still appear even when Git statuses have not changed.
+- Manual refreshes from the toolbar or keyboard shortcut continue to show progress. Switching files or diff modes retains the appropriate loading state, and refresh errors remain visible.
 
 ## Downloads
 

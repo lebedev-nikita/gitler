@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   ChevronRight,
@@ -71,6 +71,7 @@ export function Inspector({
   const detail = useQuery({
     queryKey: ["detail", ...detailKey],
     queryFn: () => repositoryApi.detail(snapshot.commonDir, selected, comparison),
+    placeholderData: keepPreviousData,
   });
   const target = comparison?.to ?? selected;
   const worktreeSelection =
@@ -96,6 +97,10 @@ export function Inspector({
     enabled: !!file,
     queryFn: () =>
       repositoryApi.diff(makeDiffRequest(snapshot.commonDir, selected, comparison, file!, mode)),
+    placeholderData: (previousData, previousQuery) =>
+      previousQuery?.queryKey.at(-2) === file?.path && previousQuery?.queryKey.at(-1) === mode
+        ? previousData
+        : undefined,
   });
   const title = comparison
     ? "Compare changes"
