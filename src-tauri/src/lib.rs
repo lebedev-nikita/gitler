@@ -1,3 +1,5 @@
+#[cfg(feature = "browser-dev")]
+pub mod browser;
 mod codex;
 pub mod git;
 mod launcher;

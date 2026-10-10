@@ -1,6 +1,7 @@
 import { Context, Effect, Layer, ManagedRuntime, Schema } from "effect";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { DEMO_PATH, demoDetail, demoDiff, demoSnapshot } from "./demo";
+import { browserConnection, browserInvoke } from "./browser";
 import {
   BranchSuggestionSchema,
   DeleteBranchPlanSchema,
@@ -34,7 +35,7 @@ class GitTransport extends Context.Service<
   static layer = Layer.succeed(GitTransport, {
     call: (command, args) =>
       Effect.tryPromise({
-        try: () => invoke<unknown>(command, args),
+        try: () => (isTauri() ? invoke<unknown>(command, args) : browserInvoke(command, args)),
         catch: (error) => new RepositoryError({ message: String(error) }),
       }),
   });
@@ -42,13 +43,14 @@ class GitTransport extends Context.Service<
 
 const runtime = ManagedRuntime.make(GitTransport.layer);
 export const desktop = isTauri();
+export const localRepository = desktop || browserConnection !== null;
 export const isDemo = (commonDir: string) => commonDir === "demo";
 
 const loadSnapshot = Effect.fn("loadSnapshot")(function* (path: string, limit: number) {
   if (path === DEMO_PATH) return demoSnapshot();
-  if (!desktop)
+  if (!localRepository)
     return yield* new RepositoryError({
-      message: "Open the desktop application to inspect a local repository.",
+      message: "Start just dev or open the desktop application to inspect a local repository.",
     });
   const transport = yield* GitTransport;
   const payload = yield* transport.call("repository_snapshot", { path, limit });
@@ -149,9 +151,9 @@ const action = Effect.fn("repositoryAction")(function* <A, I>(
   args: Record<string, unknown>,
   schema: Schema.Codec<A, I>,
 ) {
-  if (!desktop || isDemo(commonDir))
+  if (!localRepository || isDemo(commonDir))
     return yield* new RepositoryError({
-      message: "Open a local repository in the desktop app to use this action.",
+      message: "Open a local repository to use this action.",
     });
   const transport = yield* GitTransport;
   const payload = yield* transport.call(command, { commonDir, ...args });
@@ -204,7 +206,7 @@ export const repositoryApi = {
       action(commonDir, "discard_changes", { worktree, expectedHead, files }, Schema.Null),
     ),
   open: (path: string): Promise<string | null> => {
-    if (!desktop) return Promise.resolve(path);
+    if (!localRepository || path === DEMO_PATH) return Promise.resolve(path);
     return runtime.runPromise(
       GitTransport.use((transport) => transport.call("open_repository", { path })).pipe(
         Effect.flatMap(Schema.decodeUnknownEffect(Schema.NullOr(Schema.String))),
@@ -212,11 +214,13 @@ export const repositoryApi = {
     );
   },
   launchPath: (): Promise<string | null> =>
-    runtime.runPromise(
-      GitTransport.use((transport) => transport.call("launch_path", {})).pipe(
-        Effect.flatMap(Schema.decodeUnknownEffect(Schema.NullOr(Schema.String))),
-      ),
-    ),
+    !desktop
+      ? Promise.resolve(browserConnection?.path ?? null)
+      : runtime.runPromise(
+          GitTransport.use((transport) => transport.call("launch_path", {})).pipe(
+            Effect.flatMap(Schema.decodeUnknownEffect(Schema.NullOr(Schema.String))),
+          ),
+        ),
   snapshot: (path: string, limit: number): Promise<Snapshot> =>
     runtime.runPromise(loadSnapshot(path, limit)),
   detail: (common: string, selection: Selection, comparison: Comparison | null): Promise<Detail> =>

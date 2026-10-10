@@ -5,6 +5,15 @@ description = "A repository-wide Git graph and worktree inspector"
 license-file = "../LICENSE"
 authors = ["Gitler contributors"]
 edition = "2021"
+default-run = "gitler"
+
+[features]
+browser-dev = []
+
+[[bin]]
+name = "gitler-browser"
+path = "src/browser_main.rs"
+required-features = ["browser-dev"]
 
 [lib]
 name = "gitler_lib"

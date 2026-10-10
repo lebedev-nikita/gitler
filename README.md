@@ -99,7 +99,7 @@ bun run tauri dev
 Choose **Open repository**, or pass a repository or worktree path from your terminal:
 
 ```sh
-bun run tauri dev -- /path/to/any/worktree
+bun run tauri dev -- -- /path/to/any/worktree
 ```
 
 Build the desktop application with `bun run tauri build`. The compiled executable
@@ -112,12 +112,24 @@ the front and preserves your selection.
 For a local release build, run `src-tauri/target/release/gitler .` from this
 project, or put that executable on your PATH to use `gitler` from any folder.
 
-`bun run dev` opens a browser preview with explicitly labeled demo data. Real local
-repositories are available only in the desktop application.
+To develop in the browser with a real local repository, run:
+
+```sh
+just dev /path/to/repository
+```
+
+`just dev .` opens the current project. It starts a local Git backend and opens
+the browser without launching the desktop application. React updates live;
+Rust changes rebuild the backend and reload the page. Stop with Ctrl+C.
+Use **Open repository** to enter another local repository or worktree path.
+
+`just desktop-dev /path/to/repository` runs the desktop version.
+`just web` starts a browser preview with explicitly labeled demo data.
 
 ## Development
 
-Common commands are in `justfile`: `just dev`, `just build`, and `just check`.
+Common commands are in `justfile`: `just dev`, `just desktop-dev`, `just build`,
+`just local-check`, and `just check`.
 Git inspection lives in `src-tauri/src/git.rs`; the React interface is in `src/`.
 
 Version tags such as `v0.1.0` trigger the desktop release workflow. It tests and

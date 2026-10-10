@@ -42,7 +42,7 @@ import { ResizableSplit } from "@/components/ResizableSplit";
 import { useNarrowLayout, useStoredBoolean } from "@/hooks/use-layout";
 import { CopyButton, ErrorMessage, Loading, shortHash, shortPath } from "@/components/common";
 import { DEMO_PATH } from "@/lib/demo";
-import { desktop, isDemo, repositoryApi } from "@/lib/repository";
+import { desktop, localRepository, isDemo, repositoryApi } from "@/lib/repository";
 import { selectionId } from "@/lib/models";
 import type { Commit, Comparison, GraphAction, Selection } from "@/lib/models";
 import { cn } from "@/lib/utils";
@@ -60,7 +60,7 @@ function savedPath() {
 
 export default function App() {
   const queryClient = useQueryClient();
-  const [path, setPath] = useState<string | null>(desktop ? null : DEMO_PATH);
+  const [path, setPath] = useState<string | null>(localRepository ? null : DEMO_PATH);
   const [limit, setLimit] = useState(400);
   const [selected, setSelected] = useState<Selection | null>(null);
   const [comparison, setComparison] = useState<Comparison | null>(null);
@@ -100,7 +100,8 @@ export default function App() {
   }, [repository.data, resolved]);
   const remoteSync = useQuery({
     queryKey: ["remote-sync", snapshot?.commonDir],
-    enabled: desktop && !!snapshot && !isDemo(snapshot.commonDir) && snapshot.remotes.length > 0,
+    enabled:
+      localRepository && !!snapshot && !isDemo(snapshot.commonDir) && snapshot.remotes.length > 0,
     queryFn: async () => {
       try {
         await repositoryApi.fetchRemotes(snapshot!.commonDir);
@@ -138,7 +139,7 @@ export default function App() {
     setRefreshing(true);
     try {
       if (
-        desktop &&
+        localRepository &&
         repository.data &&
         !isDemo(repository.data.commonDir) &&
         repository.data.remotes.length
@@ -223,11 +224,13 @@ export default function App() {
   }, [snapshot, select]);
 
   useEffect(() => {
-    if (!desktop) return;
+    if (!localRepository) return;
     let disposed = false;
-    const unsubscribe = getCurrentWebviewWindow().listen<string>("repository-open", (event) => {
-      if (!disposed) void openRepository(event.payload);
-    });
+    const unsubscribe = desktop
+      ? getCurrentWebviewWindow().listen<string>("repository-open", (event) => {
+          if (!disposed) void openRepository(event.payload);
+        })
+      : Promise.resolve(() => {});
     void unsubscribe
       .then(async () => {
         if (disposed) return;
@@ -633,8 +636,9 @@ export default function App() {
           <DialogHeader>
             <DialogTitle>Open repository</DialogTitle>
             <DialogDescription>
-              Choose a repository or any of its working copies. Each repository opens in its own
-              window. Already open repositories are brought to the front.
+              {desktop
+                ? "Choose a repository or any of its working copies. Each repository opens in its own window. Already open repositories are brought to the front."
+                : "Enter the path to a repository or any of its working copies to open it in this tab."}
             </DialogDescription>
           </DialogHeader>
           <form
@@ -655,9 +659,9 @@ export default function App() {
                   aria-invalid={!!openError}
                 />
                 <FieldDescription>
-                  {desktop
+                  {localRepository
                     ? "A folder anywhere inside a Git repository."
-                    : "Local folders require the Gitler desktop application."}
+                    : "Start just dev or use the desktop app to open local folders."}
                 </FieldDescription>
               </Field>
               {!!openError && <ErrorMessage title="Could not open this path" error={openError} />}
@@ -687,7 +691,7 @@ export default function App() {
                   Browse folders
                 </Button>
               )}
-              <Button type="submit" disabled={opening || !inputPath.trim() || !desktop}>
+              <Button type="submit" disabled={opening || !inputPath.trim() || !localRepository}>
                 {opening && <LoaderCircle className="animate-spin" data-icon="inline-start" />}Open
                 repository
               </Button>

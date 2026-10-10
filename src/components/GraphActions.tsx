@@ -240,7 +240,7 @@ export function GraphActions({
           <Alert>
             <AlertTitle>Demo preview</AlertTitle>
             <AlertDescription>
-              Open a local repository in the desktop app to modify branches or working files.
+              Open a local repository to modify branches or working files.
             </AlertDescription>
           </Alert>
         )}
