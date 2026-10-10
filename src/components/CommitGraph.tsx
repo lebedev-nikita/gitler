@@ -7,7 +7,7 @@ import {
   GitFork,
   Search,
   SlidersHorizontal,
-  Sparkles,
+  Pencil,
   Trash2,
   X,
 } from "lucide-react";
@@ -533,10 +533,8 @@ export function CommitGraph({
                                   })
                                 }
                               >
-                                <Sparkles />
-                                {branches.length === 1
-                                  ? "Regenerate branch name with Codex…"
-                                  : `Regenerate ${branch} with Codex…`}
+                                <Pencil />
+                                {branches.length === 1 ? "Rename branch…" : `Rename ${branch}…`}
                               </ContextMenuItem>
                             ))}
                             {dirtyCopies.map((tree) => (

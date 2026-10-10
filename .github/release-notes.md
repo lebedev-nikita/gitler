@@ -1,11 +1,11 @@
-Gitler 0.3.3 adds safe cleanup of merged branches and their linked worktrees.
+Gitler 0.3.4 combines manual branch renaming and AI suggestions in one dialog.
 
 ## Changes
 
-- Delete a merged local branch and its linked worktrees from the context menu, after reviewing the branch, merge target, and worktree paths.
-- Verify merge safety against the local default branch using the full Git history, and recheck the confirmation before deletion.
-- Protect main branches, the main worktree, and worktrees containing changed, untracked, or ignored files. Locked, missing, or foreign worktrees cannot be removed.
-- Refresh the graph and reset the branch filter after deletion.
+- Choose **Rename branch…** from a local branch's context menu and edit its current name immediately, without requiring Codex.
+- Use the **Generate with AI** sparkle icon beside the name field to suggest a name from the selected branch's commits and working changes. Review or edit the suggestion before applying it.
+- Keep typed names when generation fails, cancel pending Codex requests when closing the dialog, and reject renames if the branch has moved.
+- Preserve merged-branch cleanup, selected-file discards, upstream settings, and remote branch names.
 
 ## Downloads
 

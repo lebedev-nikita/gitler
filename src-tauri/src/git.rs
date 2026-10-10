@@ -1661,7 +1661,10 @@ pub fn rename_branch(
     let common = validate_common(common_dir)?;
     validate_branch(new_name)?;
     if branch_head(&common, branch)? != expected_head {
-        return Err("The branch moved since the name was generated. Generate a new name.".into());
+        return Err(
+            "The branch moved since this rename was prepared. Close this dialog and try again."
+                .into(),
+        );
     }
     if branch == new_name {
         return Err("Choose a different branch name".into());
