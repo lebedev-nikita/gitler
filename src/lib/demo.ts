@@ -107,9 +107,11 @@ export function demoSnapshot(): Snapshot {
         upstream: index === 0 ? "origin/main" : null,
         ahead: 0,
         behind: 0,
+        mergedInto: null,
       })),
       {
         name: "origin/main",
+        mergedInto: null,
         fullName: "refs/remotes/origin/main",
         kind: "remote",
         oid: oid(1),
@@ -119,6 +121,7 @@ export function demoSnapshot(): Snapshot {
       },
       {
         name: "v0.1.0",
+        mergedInto: null,
         fullName: "refs/tags/v0.1.0",
         kind: "tag",
         oid: oid(16),

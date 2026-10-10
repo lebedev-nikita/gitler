@@ -41,6 +41,7 @@ export const ReferenceSchema = Schema.Struct({
   upstream: Schema.NullOr(Schema.String),
   ahead: Schema.Number,
   behind: Schema.Number,
+  mergedInto: Schema.NullOr(Schema.String),
 });
 export type Reference = typeof ReferenceSchema.Type;
 
@@ -142,6 +143,14 @@ export const DiscardPlanSchema = Schema.Struct({
   files: Schema.Array(DiscardFileSchema),
 });
 export type DiscardPlan = typeof DiscardPlanSchema.Type;
+export const DeleteBranchPlanSchema = Schema.Struct({
+  head: Schema.String,
+  mergedInto: Schema.String,
+  baseHead: Schema.String,
+  worktrees: Schema.Array(Schema.String),
+});
+export type DeleteBranchPlan = typeof DeleteBranchPlanSchema.Type;
 export type GraphAction =
   | { kind: "rename"; branch: string; worktree: string | null }
+  | { kind: "delete"; branch: string; worktree: string | null }
   | { kind: "discard"; worktree: string };

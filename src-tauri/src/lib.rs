@@ -179,6 +179,29 @@ async fn rename_branch(
 }
 
 #[tauri::command]
+async fn prepare_delete_branch(
+    common_dir: String,
+    branch: String,
+) -> Result<git::DeleteBranchPlan, String> {
+    tauri::async_runtime::spawn_blocking(move || git::prepare_delete_branch(&common_dir, &branch))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn delete_branch(
+    common_dir: String,
+    branch: String,
+    expected: git::DeleteBranchPlan,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git::delete_branch(&common_dir, &branch, &expected)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 async fn prepare_discard(common_dir: String, worktree: String) -> Result<git::DiscardPlan, String> {
     tauri::async_runtime::spawn_blocking(move || git::prepare_discard(&common_dir, &worktree))
         .await
@@ -265,6 +288,8 @@ pub fn run() {
             generate_branch_name,
             cancel_codegen,
             rename_branch,
+            prepare_delete_branch,
+            delete_branch,
             prepare_discard,
             discard_changes
         ])

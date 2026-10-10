@@ -60,6 +60,7 @@ pub struct Reference {
     pub upstream: Option<String>,
     pub ahead: u64,
     pub behind: u64,
+    pub merged_into: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -586,6 +587,22 @@ pub fn snapshot(path: &str, limit: usize) -> Result<Snapshot, String> {
     let has_more = commits.len() > limit;
     commits.truncate(limit);
     let raw_refs = in_repo(&common, &["for-each-ref", "--format=%(refname)%00%(objectname)%00%(*objectname)%00%(upstream:short)%00%(upstream:track)", "refs/heads", "refs/remotes", "refs/tags"])?;
+    let main = deletion_base(&common);
+    let merged = match &main {
+        Some((_, head)) => string(&in_repo(
+            &common,
+            &[
+                "for-each-ref",
+                &format!("--merged={head}"),
+                "--format=%(refname)",
+                "refs/heads",
+            ],
+        )?)
+        .lines()
+        .map(str::to_owned)
+        .collect::<std::collections::HashSet<_>>(),
+        None => std::collections::HashSet::new(),
+    };
     let mut refs = Vec::new();
     for line in raw_refs
         .split(|byte| *byte == b'\n')
@@ -624,6 +641,14 @@ pub fn snapshot(path: &str, limit: usize) -> Result<Snapshot, String> {
                 .unwrap_or(0)
         };
         refs.push(Reference {
+            merged_into: main.as_ref().and_then(|(base, _)| {
+                (kind == "branch"
+                    && name != *base
+                    && name != "main"
+                    && name != "master"
+                    && merged.contains(&full_name))
+                .then(|| base.clone())
+            }),
             name,
             full_name,
             kind: kind.into(),
@@ -1430,6 +1455,138 @@ pub fn rename_branch(
     }
     // -m refuses collisions and preserves reflogs, upstream settings and worktree HEADs.
     in_repo(&common, &["branch", "-m", "--", branch, new_name]).map(|_| ())
+}
+
+// Prefer the configured default branch, then the conventional local mainline.
+// Never infer merge safety from the paginated history shown in the graph.
+fn deletion_base(common: &Path) -> Option<(String, String)> {
+    let default = in_repo(common, &["symbolic-ref", "refs/remotes/origin/HEAD"])
+        .ok()
+        .and_then(|bytes| {
+            string(&bytes)
+                .trim()
+                .strip_prefix("refs/remotes/origin/")
+                .map(str::to_owned)
+        });
+    default
+        .into_iter()
+        .chain(["main".into(), "master".into()])
+        .find_map(|branch| branch_head(common, &branch).ok().map(|head| (branch, head)))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteBranchPlan {
+    pub head: String,
+    pub merged_into: String,
+    pub base_head: String,
+    pub worktrees: Vec<String>,
+}
+
+pub fn prepare_delete_branch(common_dir: &str, branch: &str) -> Result<DeleteBranchPlan, String> {
+    let common = validate_common(common_dir)?;
+    let head = branch_head(&common, branch)?;
+    let (base, base_head) =
+        deletion_base(&common).ok_or("No local default branch found to verify the merge")?;
+    if branch == base || branch == "main" || branch == "master" {
+        return Err("The main branch cannot be deleted".into());
+    }
+    let ancestor = string(&in_repo(&common, &["merge-base", &head, &base_head])?)
+        .trim()
+        .to_string();
+    if ancestor != head {
+        return Err(format!("This branch has not been merged into {base}"));
+    }
+    let trees = parse_worktrees(&in_repo(
+        &common,
+        &["worktree", "list", "--porcelain", "-z"],
+    )?);
+    let mut worktrees = Vec::new();
+    for (index, tree) in trees
+        .iter()
+        .enumerate()
+        .filter(|(_, tree)| tree.branch.as_deref() == Some(branch))
+    {
+        if index == 0 {
+            return Err("The repository's main worktree cannot be removed".into());
+        }
+        if tree.locked.is_some() || tree.prunable.is_some() {
+            return Err("Unlock or repair this worktree before deleting its branch".into());
+        }
+        let registered = registered_worktree(&common, &tree.path)?;
+        if registered.head != head || registered.branch.as_deref() != Some(branch) {
+            return Err("The worktree's branch changed. Refresh and try again.".into());
+        }
+        let status = in_worktree(
+            Path::new(&tree.path),
+            &[
+                "status",
+                "--porcelain=v1",
+                "-z",
+                "--untracked-files=all",
+                "--ignored=matching",
+                "--ignore-submodules=none",
+            ],
+        )?;
+        if !status.is_empty() {
+            return Err(format!("{} contains uncommitted or ignored files. Move or clean them before deleting the worktree.", tree.path));
+        }
+        worktrees.push(tree.path.clone());
+    }
+    Ok(DeleteBranchPlan {
+        head,
+        merged_into: base,
+        base_head,
+        worktrees,
+    })
+}
+
+pub fn delete_branch(
+    common_dir: &str,
+    branch: &str,
+    expected: &DeleteBranchPlan,
+) -> Result<(), String> {
+    let _guard = MUTATIONS
+        .lock()
+        .map_err(|_| "Git mutation lock unavailable")?;
+    let common = validate_common(common_dir)?;
+    let current = prepare_delete_branch(common_dir, branch)?;
+    if current != *expected {
+        return Err(
+            "The branch or its worktrees changed. Reopen the delete dialog to review them.".into(),
+        );
+    }
+    for path in &current.worktrees {
+        // Git performs its own final cleanliness/lock check; never force removal.
+        in_repo(&common, &["worktree", "remove", "--", path]).map_err(|error| format!("Could not remove {path}: {error}. Refresh to inspect the remaining worktrees; the branch was kept."))?;
+    }
+    if branch_head(&common, branch)? != current.head
+        || branch_head(&common, &current.merged_into)? != current.base_head
+    {
+        return Err(
+            "The branch moved during removal. The branch was kept; refresh and try again.".into(),
+        );
+    }
+    // -d checks merge safety again against the reviewed base, even if the branch
+    // tracks its own remote tip or the main worktree has another branch checked out.
+    // Command-local upstream overrides leave repository configuration untouched.
+    in_repo(
+        &common,
+        &[
+            "-c",
+            &format!("branch.{branch}.remote=."),
+            "-c",
+            &format!("branch.{branch}.merge=refs/heads/{}", current.merged_into),
+            "branch",
+            "-d",
+            "--",
+            branch,
+        ],
+    )
+    .map(|_| ())
+    .map_err(|error| {
+        format!("Worktrees were removed, but the branch was kept: {error}. Refresh and try again.")
+    })
 }
 
 #[derive(Debug, Serialize)]

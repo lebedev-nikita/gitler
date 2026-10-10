@@ -22,7 +22,13 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { isDemo, repositoryApi } from "@/lib/repository";
-import type { BranchSuggestion, DiscardPlan, GraphAction, Snapshot } from "@/lib/models";
+import type {
+  BranchSuggestion,
+  DeleteBranchPlan,
+  DiscardPlan,
+  GraphAction,
+  Snapshot,
+} from "@/lib/models";
 import { shortPath } from "./common";
 
 function savedCodexPath() {
@@ -45,18 +51,19 @@ export function GraphActions({
   changed: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(action.kind === "discard");
+  const [loading, setLoading] = useState(action.kind !== "rename");
   const [error, setError] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<BranchSuggestion | null>(null);
   const [name, setName] = useState("");
   const [codexPath, setCodexPath] = useState(savedCodexPath);
   const [plan, setPlan] = useState<DiscardPlan | null>(null);
+  const [deletePlan, setDeletePlan] = useState<DeleteBranchPlan | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const request = useRef<string | null>(null);
   const alive = useRef(true);
   const demo = isDemo(snapshot.commonDir);
   const tree = snapshot.worktrees.find((tree) => tree.path === action.worktree);
-  const label = action.kind === "rename" ? action.branch : (tree?.branch ?? "Detached HEAD");
+  const label = action.kind !== "discard" ? action.branch : (tree?.branch ?? "Detached HEAD");
 
   useEffect(() => {
     alive.current = true;
@@ -82,6 +89,31 @@ export function GraphActions({
           setSelected(
             new Set(plan.files.filter((file) => !file.unavailable).map((file) => file.path)),
           );
+        })
+        .catch((error: unknown) => {
+          if (!disposed) setError(error instanceof Error ? error.message : String(error));
+        })
+        .finally(() => {
+          if (!disposed) setLoading(false);
+        });
+    }
+    if (action.kind === "delete") {
+      const reference = snapshot.refs.find(
+        (ref) => ref.kind === "branch" && ref.name === action.branch,
+      );
+      const preview = demo
+        ? Promise.resolve({
+            head: reference?.oid ?? "",
+            mergedInto: reference?.mergedInto ?? "main",
+            baseHead: snapshot.refs.find((ref) => ref.name === reference?.mergedInto)?.oid ?? "",
+            worktrees: snapshot.worktrees
+              .filter((tree) => tree.branch === action.branch)
+              .map((tree) => tree.path),
+          })
+        : repositoryApi.prepareDeleteBranch(snapshot.commonDir, action.branch);
+      void preview
+        .then((plan) => {
+          if (!disposed) setDeletePlan(plan);
         })
         .catch((error: unknown) => {
           if (!disposed) setError(error instanceof Error ? error.message : String(error));
@@ -155,6 +187,8 @@ export function GraphActions({
             .filter((file) => selected.has(file.path))
             .map(({ path, token }) => ({ path, token })),
         );
+      } else if (action.kind === "delete" && deletePlan) {
+        await repositoryApi.deleteBranch(snapshot.commonDir, action.branch, deletePlan);
       } else {
         return;
       }
@@ -180,17 +214,23 @@ export function GraphActions({
       >
         <DialogHeader>
           <DialogTitle>
-            {action.kind === "rename" ? "Rename branch with Codex" : "Discard uncommitted changes"}
+            {action.kind === "rename"
+              ? "Rename branch with Codex"
+              : action.kind === "delete"
+                ? "Delete merged branch"
+                : "Discard uncommitted changes"}
           </DialogTitle>
           <DialogDescription>
             {action.kind === "rename"
               ? "Generate a name from this branch’s commits and working changes, then review it before renaming locally."
-              : "Restore selected files to HEAD, including staged and unstaged edits. Selected untracked and newly added files will be deleted permanently."}
+              : action.kind === "delete"
+                ? "Delete this local branch and its worktrees after verifying it is merged. Worktree directories will be removed permanently."
+                : "Restore selected files to HEAD, including staged and unstaged edits. Selected untracked and newly added files will be deleted permanently."}
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-[4px] min-w-0 wrap-anywhere">
           <strong>{label}</strong>
-          {action.worktree && (
+          {action.worktree && action.kind !== "delete" && (
             <span className="text-muted-foreground text-[11px]" title={action.worktree}>
               {shortPath(action.worktree)}
             </span>
@@ -200,11 +240,40 @@ export function GraphActions({
           <Alert>
             <AlertTitle>Demo preview</AlertTitle>
             <AlertDescription>
-              Open a local repository in the desktop app to generate names or discard files.
+              Open a local repository in the desktop app to modify branches or working files.
             </AlertDescription>
           </Alert>
         )}
-        {action.kind === "rename" ? (
+        {action.kind === "delete" ? (
+          loading ? (
+            <p className="flex items-center gap-[8px] text-muted-foreground" role="status">
+              <LoaderCircle className="animate-spin size-[16px]" /> Checking merge and worktrees…
+            </p>
+          ) : (
+            deletePlan && (
+              <div className="flex flex-col gap-3 min-w-0 wrap-anywhere">
+                <p>
+                  Merged into <strong>{deletePlan.mergedInto}</strong>. No uncommitted changes will
+                  be discarded.
+                </p>
+                {deletePlan.worktrees.length > 0 ? (
+                  <ul
+                    className="flex flex-col gap-2 max-h-[280px] overflow-y-auto"
+                    aria-label="Worktrees to delete"
+                  >
+                    {deletePlan.worktrees.map((path) => (
+                      <li key={path} className="font-mono text-[11px]">
+                        {path}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>This branch has no worktree. Only the local branch will be deleted.</p>
+                )}
+              </div>
+            )
+          )
+        ) : action.kind === "rename" ? (
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="branch-name">New branch name</FieldLabel>
@@ -316,7 +385,11 @@ export function GraphActions({
           <Alert variant="destructive">
             <AlertTriangle />
             <AlertTitle>
-              {action.kind === "rename" ? "Could not rename branch" : "Could not discard changes"}
+              {action.kind === "rename"
+                ? "Could not rename branch"
+                : action.kind === "delete"
+                  ? "Could not delete branch"
+                  : "Could not discard changes"}
             </AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
@@ -341,14 +414,16 @@ export function GraphActions({
             </Button>
           )}
           <Button
-            variant={action.kind === "discard" ? "destructive" : "default"}
+            variant={action.kind === "rename" ? "default" : "destructive"}
             disabled={
               demo ||
               loading ||
               busy ||
               (action.kind === "rename"
                 ? !suggestion || !name.trim() || name.trim() === action.branch
-                : !plan || selected.size === 0)
+                : action.kind === "delete"
+                  ? !deletePlan || !!error
+                  : !plan || selected.size === 0)
             }
             onClick={() => void apply()}
           >
@@ -357,7 +432,11 @@ export function GraphActions({
               ? "Applying…"
               : action.kind === "rename"
                 ? "Rename branch"
-                : `Discard ${selected.size} ${selected.size === 1 ? "file" : "files"}`}
+                : action.kind === "delete"
+                  ? deletePlan?.worktrees.length
+                    ? "Delete branch and worktree"
+                    : "Delete branch"
+                  : `Discard ${selected.size} ${selected.size === 1 ? "file" : "files"}`}
           </Button>
         </DialogFooter>
       </DialogContent>
