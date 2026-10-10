@@ -6,12 +6,17 @@ async function mockDesktop(
   fail = false,
   slow = false,
   deleteFailure = false,
+  omitWorktree = false,
 ) {
   const snapshot = { ...demoSnapshot(), commonDir: "/fixture/.git" };
   snapshot.refs = snapshot.refs.map((ref) => ({
     ...ref,
     mergedInto: ["feature/worktree-map", "agent/cleanup"].includes(ref.name) ? "main" : null,
   }));
+  if (omitWorktree)
+    snapshot.worktrees = snapshot.worktrees.filter(
+      (tree) => tree.branch !== "feature/worktree-map",
+    );
   await page.addInitScript(
     ({ snapshot, fail, slow, deleteFailure }) => {
       const current = window as unknown as {
@@ -127,8 +132,10 @@ test("Codex rename is generated from the right-clicked branch and applied after 
     .getByRole("button", { name: "Uncommitted changes on agent/auth-flow", exact: true })
     .click({ button: "right" });
   await expect(page.getByRole("menuitem", { name: "Discard uncommitted changes…" })).toBeVisible();
-  await page.getByRole("menuitem", { name: "Regenerate branch name with Codex…" }).click();
-  const dialog = page.getByRole("dialog", { name: "Rename branch with Codex" });
+  await page.getByRole("menuitem", { name: "Rename branch…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Rename branch" });
+  await expect(dialog.getByLabel("New branch name")).toHaveValue("agent/auth-flow");
+  await dialog.getByRole("button", { name: "Generate with AI", exact: true }).click();
   await expect(dialog.getByLabel("New branch name")).toHaveValue("agent/improve-auth-refresh");
   await dialog.getByLabel("New branch name").fill("fix/auth-token-refresh");
   await page.screenshot({
@@ -153,6 +160,64 @@ test("Codex rename is generated from the right-clicked branch and applied after 
     branch: "agent/auth-flow",
     newName: "fix/auth-token-refresh",
     commonDir: "/fixture/.git",
+    expectedHead: demoSnapshot().worktrees[1].head,
+  });
+});
+
+test("manual rename works without Codex and fits the minimum desktop window", async ({ page }) => {
+  await mockDesktop(page, true);
+  await page.setViewportSize({ width: 900, height: 600 });
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Uncommitted changes on agent/auth-flow", exact: true })
+    .click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Rename branch…", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Rename branch", exact: true });
+  const input = dialog.getByLabel("New branch name");
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue("agent/auth-flow");
+  const rename = dialog.getByRole("button", { name: "Rename branch", exact: true });
+  await expect(rename).toBeDisabled();
+  await input.fill("   ");
+  await expect(rename).toBeDisabled();
+  await input.fill(" fix/manual-auth-refresh ");
+  await expect(rename).toBeInViewport();
+  const generate = dialog.getByRole("button", { name: "Generate with AI", exact: true });
+  await expect(generate).toBeInViewport();
+  await generate.hover();
+  await expect(page.getByText("Generate with AI", { exact: true })).toBeVisible();
+  await page.screenshot({ path: ".impeccable/review/rename-minimum.png", animations: "disabled" });
+  await rename.click();
+  await expect(dialog).toHaveCount(0);
+  const calls = await page.evaluate(
+    () => (window as unknown as { calls: Array<{ command: string; args: unknown }> }).calls,
+  );
+  expect(calls.some((call) => call.command === "generate_branch_name")).toBe(false);
+  expect(calls.find((call) => call.command === "rename_branch")?.args).toMatchObject({
+    branch: "agent/auth-flow",
+    newName: "fix/manual-auth-refresh",
+    expectedHead: demoSnapshot().worktrees[1].head,
+  });
+});
+
+test("a branch without a worktree can be renamed from its label", async ({ page }) => {
+  await mockDesktop(page, true, false, false, true);
+  await page.goto("/");
+  await page.getByText("feature/worktree-map", { exact: true }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Rename branch…", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Rename branch", exact: true });
+  await dialog.getByLabel("New branch name").fill("feature/repository-map");
+  await dialog.getByRole("button", { name: "Rename branch", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  const call = await page.evaluate(() =>
+    (window as unknown as { calls: Array<{ command: string; args: unknown }> }).calls.find(
+      (call) => call.command === "rename_branch",
+    ),
+  );
+  expect(call?.args).toMatchObject({
+    branch: "feature/worktree-map",
+    newName: "feature/repository-map",
+    expectedHead: demoSnapshot().refs.find((ref) => ref.name === "feature/worktree-map")!.oid,
   });
 });
 
@@ -195,11 +260,14 @@ test("Codex errors allow retry and cancel does not rename the branch", async ({ 
   await page
     .getByRole("button", { name: "Uncommitted changes on agent/auth-flow", exact: true })
     .click({ button: "right" });
-  await page.getByRole("menuitem", { name: "Regenerate branch name with Codex…" }).click();
+  await page.getByRole("menuitem", { name: "Rename branch…" }).click();
   const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("New branch name").fill("fix/manual-auth-refresh");
+  await dialog.getByRole("button", { name: "Generate with AI", exact: true }).click();
   await expect(dialog).toContainText("Codex login is required");
-  await expect(dialog.getByRole("button", { name: "Rename branch", exact: true })).toBeDisabled();
-  await expect(dialog.getByRole("button", { name: "Generate name", exact: true })).toBeEnabled();
+  await expect(dialog.getByLabel("New branch name")).toHaveValue("fix/manual-auth-refresh");
+  await expect(dialog.getByRole("button", { name: "Rename branch", exact: true })).toBeEnabled();
+  await expect(dialog.getByRole("button", { name: "Generate with AI", exact: true })).toBeEnabled();
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   const calls = await page.evaluate(
     () => (window as unknown as { calls: Array<{ command: string }> }).calls,
@@ -213,7 +281,10 @@ test("closing a pending generation cancels its Codex process", async ({ page }) 
   await page
     .getByRole("button", { name: "Uncommitted changes on agent/auth-flow", exact: true })
     .click({ button: "right" });
-  await page.getByRole("menuitem", { name: "Regenerate branch name with Codex…" }).click();
+  await page.getByRole("menuitem", { name: "Rename branch…" }).click();
+  await page.getByRole("button", { name: "Generate with AI", exact: true }).click();
+  await expect(page.getByLabel("New branch name")).toHaveValue("agent/auth-flow");
+  await expect(page.getByRole("button", { name: "Rename branch", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Cancel generation", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect

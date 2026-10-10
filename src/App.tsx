@@ -853,8 +853,8 @@ export default function App() {
           <DialogHeader>
             <DialogTitle>Move through your repository</DialogTitle>
             <DialogDescription>
-              Inspect history, rename local branches with Codex, and discard selected working
-              changes from the graph’s context menu.
+              Inspect history, rename local branches, and discard selected working changes from the
+              graph’s context menu.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-[14px] text-[12px]">

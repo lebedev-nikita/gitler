@@ -21,14 +21,15 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { isDemo, repositoryApi } from "@/lib/repository";
-import type {
-  BranchSuggestion,
-  DeleteBranchPlan,
-  DiscardPlan,
-  GraphAction,
-  Snapshot,
-} from "@/lib/models";
+import type { DeleteBranchPlan, DiscardPlan, GraphAction, Snapshot } from "@/lib/models";
 import { shortPath } from "./common";
 
 function savedCodexPath() {
@@ -53,8 +54,13 @@ export function GraphActions({
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(action.kind !== "rename");
   const [error, setError] = useState<string | null>(null);
-  const [suggestion, setSuggestion] = useState<BranchSuggestion | null>(null);
-  const [name, setName] = useState("");
+  const [expectedHead, setExpectedHead] = useState(() =>
+    action.kind === "rename"
+      ? snapshot.refs.find((ref) => ref.kind === "branch" && ref.name === action.branch)?.oid
+      : undefined,
+  );
+  const [name, setName] = useState(action.kind === "rename" ? action.branch : "");
+  const nameInput = useRef<HTMLInputElement>(null);
   const [codexPath, setCodexPath] = useState(savedCodexPath);
   const [plan, setPlan] = useState<DiscardPlan | null>(null);
   const [deletePlan, setDeletePlan] = useState<DeleteBranchPlan | null>(null);
@@ -68,9 +74,6 @@ export function GraphActions({
   useEffect(() => {
     alive.current = true;
     let disposed = false;
-    queueMicrotask(() => {
-      if (!disposed && action.kind === "rename" && !demo) void generate();
-    });
     if (action.kind === "discard") {
       const preview = demo
         ? Promise.resolve({
@@ -133,12 +136,10 @@ export function GraphActions({
   }, [action, snapshot.commonDir, demo]);
 
   async function generate() {
-    if (action.kind !== "rename") return;
+    if (action.kind !== "rename" || loading || busy || demo) return;
     const id = crypto.randomUUID();
     request.current = id;
     setLoading(true);
-    setSuggestion(null);
-    setName("");
     setError(null);
     try {
       try {
@@ -154,8 +155,14 @@ export function GraphActions({
         codexPath,
       );
       if (!alive.current || request.current !== id) return;
-      setSuggestion(result);
+      setExpectedHead(result.head);
       setName(result.branchName);
+      requestAnimationFrame(() => {
+        if (alive.current) {
+          nameInput.current?.focus();
+          nameInput.current?.select();
+        }
+      });
     } catch (error) {
       if (alive.current && request.current === id)
         setError(error instanceof Error ? error.message : String(error));
@@ -171,12 +178,12 @@ export function GraphActions({
     setBusy(true);
     setError(null);
     try {
-      if (action.kind === "rename" && suggestion) {
+      if (action.kind === "rename" && expectedHead) {
         await repositoryApi.renameBranch(
           snapshot.commonDir,
           action.branch,
           name.trim(),
-          suggestion.head,
+          expectedHead,
         );
       } else if (action.kind === "discard" && plan) {
         await repositoryApi.discardChanges(
@@ -215,14 +222,14 @@ export function GraphActions({
         <DialogHeader>
           <DialogTitle>
             {action.kind === "rename"
-              ? "Rename branch with Codex"
+              ? "Rename branch"
               : action.kind === "delete"
                 ? "Delete merged branch"
                 : "Discard uncommitted changes"}
           </DialogTitle>
           <DialogDescription>
             {action.kind === "rename"
-              ? "Generate a name from this branch’s commits and working changes, then review it before renaming locally."
+              ? "Enter a new name, or generate one with AI from this branch’s commits and working changes."
               : action.kind === "delete"
                 ? "Delete this local branch and its worktrees after verifying it is merged. Worktree directories will be removed permanently."
                 : "Restore selected files to HEAD, including staged and unstaged edits. Selected untracked and newly added files will be deleted permanently."}
@@ -277,15 +284,36 @@ export function GraphActions({
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="branch-name">New branch name</FieldLabel>
-              <Input
-                id="branch-name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Generate a suggestion first"
-                disabled={!suggestion || loading || busy}
-                autoComplete="off"
-                spellCheck={false}
-              />
+              <InputGroup>
+                <InputGroupInput
+                  ref={nameInput}
+                  id="branch-name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  disabled={demo || loading || busy}
+                  autoComplete="off"
+                  spellCheck={false}
+                  autoFocus
+                  onFocus={(event) => event.target.select()}
+                />
+                <InputGroupAddon align="inline-end">
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <InputGroupButton
+                          size="icon-sm"
+                          aria-label="Generate with AI"
+                          disabled={demo || loading || busy}
+                          onClick={() => void generate()}
+                        >
+                          {loading ? <LoaderCircle className="animate-spin" /> : <Sparkles />}
+                        </InputGroupButton>
+                      }
+                    />
+                    <TooltipContent>Generate with AI</TooltipContent>
+                  </Tooltip>
+                </InputGroupAddon>
+              </InputGroup>
               <FieldDescription>
                 Only the local branch is renamed. Its upstream remains configured.
               </FieldDescription>
@@ -403,16 +431,6 @@ export function GraphActions({
           <Button variant="outline" onClick={close} disabled={busy}>
             {loading && action.kind === "rename" ? "Cancel generation" : "Cancel"}
           </Button>
-          {action.kind === "rename" && (
-            <Button
-              variant="outline"
-              disabled={demo || loading || busy}
-              onClick={() => void generate()}
-            >
-              <Sparkles data-icon="inline-start" />
-              {suggestion ? "Regenerate" : "Generate name"}
-            </Button>
-          )}
           <Button
             variant={action.kind === "rename" ? "default" : "destructive"}
             disabled={
@@ -420,7 +438,7 @@ export function GraphActions({
               loading ||
               busy ||
               (action.kind === "rename"
-                ? !suggestion || !name.trim() || name.trim() === action.branch
+                ? !expectedHead || !name.trim() || name.trim() === action.branch
                 : action.kind === "delete"
                   ? !deletePlan || !!error
                   : !plan || selected.size === 0)
