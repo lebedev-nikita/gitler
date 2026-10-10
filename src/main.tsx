@@ -17,10 +17,15 @@ class ErrorBoundary extends React.Component<React.PropsWithChildren, { failed: b
   render() {
     if (this.state.failed)
       return (
-        <main className="fatal-error">
+        <main className="p-[40px]">
           <h1>Gitler could not render this view</h1>
           <p>Reload the application to try again.</p>
-          <button onClick={() => window.location.reload()}>Reload Gitler</button>
+          <button
+            className="py-[10px] px-[16px] bg-primary text-primary-foreground rounded-[5px]"
+            onClick={() => window.location.reload()}
+          >
+            Reload Gitler
+          </button>
         </main>
       );
     return this.props.children;

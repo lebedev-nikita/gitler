@@ -89,8 +89,11 @@ export function EmptyMessage({
 
 export function Loading({ text = "Loading…" }: { text?: string }) {
   return (
-    <div className="loading-state" role="status">
-      <LoaderCircle className="spin" />
+    <div
+      className="flex items-center justify-center gap-[8px] py-[36px] px-[18px] text-muted-foreground text-[12px]"
+      role="status"
+    >
+      <LoaderCircle className="animate-spin size-[15px]" />
       {text}
     </div>
   );
