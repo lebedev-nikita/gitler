@@ -13,6 +13,9 @@
     "windows": [
       {
         "title": "Gitler",
+        "theme": "Dark",
+        "titleBarStyle": "Transparent",
+        "backgroundColor": "#1d2a36",
         "width": 1480,
         "height": 940,
         "minWidth": 900,
