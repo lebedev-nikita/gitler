@@ -1281,9 +1281,10 @@ dependencies = [
 
 [[package]]
 name = "gitler"
-version = "0.2.0-rc.2"
+version = "0.2.0"
 dependencies = [
  "dunce",
+ "libc",
  "serde",
  "serde_json",
  "tauri",

@@ -1,4 +1,5 @@
 pub mod git;
+mod launcher;
 mod windows;
 
 use std::path::{Path, PathBuf};
@@ -117,6 +118,14 @@ pub fn run() {
             return;
         }
     };
+    match launcher::detach(!cfg!(debug_assertions)) {
+        Ok(true) => return,
+        Ok(false) => {}
+        Err(error) => {
+            eprintln!("Could not launch Gitler: {error}");
+            std::process::exit(1);
+        }
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
             if let Ok(Some(path)) = cli_path(&args, Path::new(&cwd)) {
