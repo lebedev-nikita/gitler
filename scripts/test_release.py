@@ -18,6 +18,8 @@ CASK = '''cask "gitler" do
          intel: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 
   url "https://github.com/lebedev-nikita/gitler/releases/download/v#{version}/Gitler_#{version}_macos-#{arch}.app.tar.gz"
+  depends_on formula: "git"
+  depends_on :macos
   app "Gitler.app"
   binary "#{appdir}/Gitler.app/Contents/MacOS/gitler"
 end
@@ -27,7 +29,6 @@ end
 def macos_checksums(app_version):
     return (
         f'{"1" * 64}  Gitler_{app_version}_macos-arm64.app.tar.gz\n'
-        f'{"2" * 64}  Gitler_{app_version}_macos-x64.app.tar.gz\n'
         f'{"3" * 64}  Gitler_{app_version}_macos-arm64.dmg\n'
     )
 
@@ -58,15 +59,7 @@ class ReleaseTests(unittest.TestCase):
     def test_complete_downloads_get_checksums_and_publish_to_the_correct_channel(self):
         for app_version, prerelease, latest in [("0.2.0-rc.1", "true", "false"), ("0.2.0", "false", "true")]:
             with self.subTest(version=app_version):
-                suffixes = {
-                    "macos-arm64": [".dmg", ".app.tar.gz"],
-                    "macos-x64": [".dmg", ".app.tar.gz"],
-                    "windows-x64": [".exe", ".msi"],
-                    "windows-arm64": [".exe"],
-                    "linux-x64": [".AppImage", ".deb", ".rpm"],
-                    "linux-arm64": [".AppImage", ".deb", ".rpm"],
-                }
-                names = [f"Gitler_{app_version}_{platform}{suffix}" for platform, formats in suffixes.items() for suffix in formats]
+                names = [f"Gitler_{app_version}_macos-arm64{suffix}" for suffix in (".dmg", ".app.tar.gz")]
                 data = {"isDraft": True, "url": "https://github.com/owner/repo/releases/test", "assets": [{"name": name, "size": 1} for name in names]}
                 checksums = []
 
@@ -83,32 +76,50 @@ class ReleaseTests(unittest.TestCase):
                         patch.object(release, "gh", side_effect=gh) as calls, \
                         contextlib.redirect_stdout(io.StringIO()):
                     release.publish(f"v{app_version}")
-                self.assertEqual(len(checksums), 13)
+                self.assertEqual(len(checksums), 2)
                 self.assertEqual({line.split("  ")[1] for line in checksums}, set(names))
                 self.assertTrue(all(line.startswith("2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881  ") for line in checksums))
                 calls.assert_called_with("release", "edit", f"v{app_version}", "--draft=false", f"--prerelease={prerelease}", f"--latest={latest}")
 
     def test_incomplete_downloads_cannot_be_published(self):
-        with patch.object(release, "version", return_value="0.2.0-rc.1"), \
-                patch.object(release, "release", return_value={"isDraft": True, "assets": []}), \
-                patch.object(release, "gh") as gh:
-            with self.assertRaisesRegex(SystemExit, "Missing platform downloads"):
-                release.publish("v0.2.0-rc.1")
-            gh.assert_not_called()
+        names = ["Gitler_0.2.0-rc.1_macos-arm64" + suffix for suffix in (".dmg", ".app.tar.gz")]
+        for assets in ([], [{"name": names[0], "size": 1}], [{"name": names[1], "size": 1}], [{"name": name, "size": 0} for name in names]):
+            with self.subTest(assets=assets), patch.object(release, "version", return_value="0.2.0-rc.1"), \
+                    patch.object(release, "release", return_value={"isDraft": True, "assets": assets}), \
+                    patch.object(release, "gh") as gh:
+                with self.assertRaisesRegex(SystemExit, "Missing Apple Silicon downloads"):
+                    release.publish("v0.2.0-rc.1")
+                gh.assert_not_called()
+
+    def test_unsupported_downloads_cannot_be_published(self):
+        assets = [{"name": f"Gitler_0.2.2_macos-arm64{suffix}", "size": 1} for suffix in (".dmg", ".app.tar.gz")]
+        for name in ("Gitler_0.2.2_macos-x64.dmg", "Gitler_0.2.2_windows-x64.exe", "Gitler_0.2.2_linux-arm64.deb"):
+            with self.subTest(name=name), patch.object(release, "version", return_value="0.2.2"), \
+                    patch.object(release, "release", return_value={"isDraft": True, "assets": assets + [{"name": name, "size": 1}]}), \
+                    patch.object(release, "gh") as gh:
+                with self.assertRaisesRegex(SystemExit, "Unexpected release downloads"):
+                    release.publish("v0.2.2")
+                gh.assert_not_called()
 
 
 class TapTests(unittest.TestCase):
-    def test_updates_only_version_and_architecture_archive_hashes(self):
+    def test_migrates_the_tap_to_apple_silicon_and_updates_subsequent_releases(self):
         for app_version in ("0.2.2", "0.3.0-rc.1", "0.3.0+build-1"):
             with self.subTest(version=app_version):
                 expected = CASK.replace('version "0.2.1"', f'version "{app_version}"')
-                expected = expected.replace("a" * 64, "1" * 64).replace("b" * 64, "2" * 64)
+                expected = expected.replace('  arch arm: "arm64", intel: "x64"\n\n', '')
+                expected = expected.replace('  sha256 arm:   "' + "a" * 64 + '",\n         intel: "' + "b" * 64 + '"', '  sha256 "' + "1" * 64 + '"')
+                expected = expected.replace('macos-#{arch}', 'macos-arm64')
+                expected = expected.replace('  depends_on :macos', '  depends_on arch: :arm64\n  depends_on :macos')
                 self.assertEqual(release.tap_cask(CASK, app_version, macos_checksums(app_version)), expected)
+                self.assertEqual(release.tap_cask(expected, app_version, macos_checksums(app_version)), expected)
+                newer = expected.replace(f'version "{app_version}"', 'version "0.4.0"').replace("1" * 64, "4" * 64)
+                self.assertEqual(release.tap_cask(expected, "0.4.0", macos_checksums("0.4.0").replace("1" * 64, "4" * 64)), newer)
 
     def test_missing_duplicate_or_invalid_checksums_are_rejected(self):
         valid = macos_checksums("0.2.2")
         for checksums in (
-            "", valid.splitlines()[0], valid + valid.splitlines()[0] + "\n",
+            "", valid.splitlines()[1], valid + valid.splitlines()[0] + "\n",
             valid.replace("1" * 64, "not-a-sha256"), macos_checksums("0.2.1"),
         ):
             with self.subTest(checksums=checksums), self.assertRaisesRegex(SystemExit, "Expected one SHA-256"):

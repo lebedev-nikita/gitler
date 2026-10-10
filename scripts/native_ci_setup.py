@@ -2,10 +2,8 @@
 
 import os
 from pathlib import Path
-import shutil
 import subprocess
 import sys
-import tempfile
 import time
 import traceback
 
@@ -19,14 +17,10 @@ def state_dir():
 def start(name, arguments):
     state = state_dir()
     (state / f"{name}.exit").unlink(missing_ok=True)
-    options = (
-        {"creationflags": subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP}
-        if os.name == "nt" else {"start_new_session": True}
-    )
     with (state / f"{name}.log").open("wb") as log:
         return subprocess.Popen(
             [sys.executable, str(Path(__file__).resolve()), "worker", name, *arguments],
-            stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, **options,
+            stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
         )
 
 
@@ -51,30 +45,11 @@ def worker(name, arguments):
                 "rustup", "toolchain", "install", "1.99.0", "--profile", "minimal",
                 "--no-self-update", "--target", arguments[0],
             ]]
-        elif name == "linux":
-            # RUNNER_TEMP may be private to the runner. APT's unprivileged
-            # downloader needs a traversable parent; copy cache files to /tmp.
-            cached_archives = Path(os.environ["RUNNER_TEMP"]) / "gitler-apt-archives"
-            archives = Path(tempfile.gettempdir()) / "gitler-apt-archives"
-            archives.mkdir(parents=True, exist_ok=True)
-            for package in cached_archives.glob("*.deb"):
-                shutil.copyfile(package, archives / package.name)
-            commands = [
-                ["sudo", "apt-get", "update"],
-                ["sudo", "apt-get", "-o", f"Dir::Cache::archives={archives}",
-                 "-o", "APT::Keep-Downloaded-Packages=true", "install", "-y", "--no-install-recommends",
-                 "libwebkit2gtk-4.1-dev", "build-essential", "libssl-dev", "libgtk-3-dev",
-                 "libayatana-appindicator3-dev", "librsvg2-dev", "patchelf", "libfuse2", "rpm"],
-            ]
         else:
             raise ValueError(f"Unknown prerequisite: {name}")
         for command in commands:
             print("Running: " + " ".join(command), flush=True)
             subprocess.run(command, check=True)
-        if name == "linux":
-            cached_archives.mkdir(parents=True, exist_ok=True)
-            for package in archives.glob("*.deb"):
-                shutil.copyfile(package, cached_archives / package.name)
         code = 0
     except subprocess.CalledProcessError as error:
         code = error.returncode or 1
@@ -93,12 +68,9 @@ if __name__ == "__main__":
         raise SystemExit(worker(sys.argv[2], sys.argv[3:]))
     if sys.argv[1] == "start":
         start("rust", [sys.argv[2]])
-        if sys.platform == "linux":
-            start("linux", [])
         print("Native prerequisites started; cache restoration can run concurrently")
     elif sys.argv[1] == "wait":
-        for name in (["rust", "linux"] if sys.platform == "linux" else ["rust"]):
-            if code := wait(name):
-                raise SystemExit(code)
+        if code := wait("rust"):
+            raise SystemExit(code)
     else:
         raise SystemExit("Expected start or wait")

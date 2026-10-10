@@ -67,11 +67,7 @@ fn discovers_all_worktrees_from_any_path_and_preserves_git_state() {
         ],
     );
     fs::write(worktree.join("file.txt"), "changed\n").unwrap();
-    let new_file = if cfg!(windows) {
-        "new ü file.txt"
-    } else {
-        "new\tfile\n.txt"
-    };
+    let new_file = "new\tfile\n.txt";
     fs::write(worktree.join(new_file), "new\n").unwrap();
     let index = fs::read(repo.path().join(".git/index")).unwrap();
     let head = git(repo.path(), &["rev-parse", "HEAD"]);

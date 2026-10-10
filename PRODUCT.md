@@ -6,7 +6,7 @@
 
 web
 
-The web interface runs locally inside a Tauri desktop application.
+The web interface runs locally inside a Tauri desktop application for macOS on Apple Silicon.
 
 ## Stack
 
