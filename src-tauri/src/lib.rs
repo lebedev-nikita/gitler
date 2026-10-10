@@ -80,16 +80,7 @@ async fn fetch_remotes(common_dir: String) -> Result<(), String> {
 async fn open_remote(common_dir: String, name: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let url = git::remote_url(&common_dir, &name)?;
-        #[cfg(target_os = "macos")]
         let mut command = std::process::Command::new("open");
-        #[cfg(target_os = "windows")]
-        let mut command = {
-            let mut command = std::process::Command::new("rundll32.exe");
-            command.arg("url.dll,FileProtocolHandler");
-            command
-        };
-        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-        let mut command = std::process::Command::new("xdg-open");
         let status = command
             .arg(url)
             .status()

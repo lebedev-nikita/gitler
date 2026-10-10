@@ -71,6 +71,12 @@ export default function App() {
   const [openDialog, setOpenDialog] = useState(false);
   const [graphAction, setGraphAction] = useState<GraphAction | null>(null);
   const [infoDialog, setInfoDialog] = useState(false);
+  const [infoSection, setInfoSection] = useState<"repository" | "remotes">("repository");
+  const showInfo = (section: "repository" | "remotes" = "repository") => {
+    setInfoSection(section);
+    setInfoDialog(true);
+  };
+  const remotesHeading = useRef<HTMLHeadingElement>(null);
   const [shortcutsDialog, setShortcutsDialog] = useState(false);
   const [inputPath, setInputPath] = useState("");
   const [opening, setOpening] = useState(false);
@@ -123,7 +129,7 @@ export default function App() {
       await repositoryApi.openRemote(snapshot.commonDir, name);
     } catch (error) {
       setRemoteOpenError(error);
-      setInfoDialog(true);
+      showInfo("remotes");
     }
   };
   const refreshBusy = repository.isLoading || refreshing;
@@ -291,7 +297,7 @@ export default function App() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => snapshot && setInfoDialog(true)}
+          onClick={() => snapshot && showInfo()}
           disabled={!snapshot}
         >
           <GitBranch data-icon="inline-start" />
@@ -441,7 +447,7 @@ export default function App() {
               {unavailable.length > 0 && (
                 <button
                   className="inline-flex gap-[4px] items-center text-destructive"
-                  onClick={() => setInfoDialog(true)}
+                  onClick={() => showInfo()}
                 >
                   <AlertTriangle className="size-[15px] text-inherit" />
                   {unavailable.length} unavailable
@@ -574,7 +580,7 @@ export default function App() {
                 "inline-flex items-center gap-[5px] flex-none",
                 remoteSync.isError && "text-destructive",
               )}
-              onClick={() => setInfoDialog(true)}
+              onClick={() => showInfo("remotes")}
               title="Remote updates and repository information"
             >
               <CloudDownload className="size-[12px]" />
@@ -673,7 +679,14 @@ export default function App() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={infoDialog} onOpenChange={setInfoDialog}>
+      <Dialog
+        open={infoDialog}
+        onOpenChange={setInfoDialog}
+        onOpenChangeComplete={(open) => {
+          if (open && infoSection === "remotes")
+            remotesHeading.current?.scrollIntoView({ block: "start" });
+        }}
+      >
         <DialogContent className="max-h-[85dvh]">
           <DialogHeader>
             <DialogTitle>{snapshot?.name ?? "Repository"}</DialogTitle>
@@ -725,7 +738,12 @@ export default function App() {
                   )}
                 </div>
               ))}
-              <h3 className="text-[12px] font-semibold mt-[24px] mx-0 mb-[10px]">Remotes</h3>
+              <h3
+                ref={remotesHeading}
+                className="text-[12px] font-semibold mt-[24px] mx-0 mb-[10px]"
+              >
+                Remotes
+              </h3>
               {!!remoteOpenError && (
                 <ErrorMessage title="Could not open remote" error={remoteOpenError} />
               )}

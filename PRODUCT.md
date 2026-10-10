@@ -6,7 +6,7 @@
 
 web
 
-The web interface runs locally inside a Tauri desktop application.
+The web interface runs locally inside a Tauri desktop application for macOS on Apple Silicon.
 
 ## Stack
 
@@ -28,7 +28,8 @@ The application opens from the GUI or CLI using any path inside the repository.
 ## Capabilities and Constraints
 
 Repository-wide navigation independent of the currently checked-out branch. Git Graph is the functional reference.
-Mutations are limited to reviewed local branch renames and confirmed selected-file discards. The interface language is English.
+Configured remotes are visible and supported remote URLs open in the browser. Remote-tracking branches update automatically every minute; failed updates expose a retry action.
+Snapshot inspection remains read-only. Background fetches may update only remote-tracking branches, preserving local branches, tags, indexes, and working files regardless of configured fetch refspecs. Other mutations are limited to reviewed local branch renames and confirmed selected-file discards. The interface language is English.
 Worktrees are part of branches, never a separate top-level concept. The user requested a
 minimal interface with no left branch panel and filters exposed only as needed.
 Open decisions: broader mutation scope and full Git Graph feature parity.

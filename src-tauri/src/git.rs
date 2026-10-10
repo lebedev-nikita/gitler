@@ -143,11 +143,6 @@ fn git_command() -> Command {
         .env("GIT_OPTIONAL_LOCKS", "0")
         .env("GIT_TERMINAL_PROMPT", "0")
         .env("GIT_LITERAL_PATHSPECS", "1");
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000);
-    }
     command
 }
 
@@ -211,12 +206,6 @@ fn execute_with_output_policy(
         unsafe {
             libc::kill(-(child.id() as i32), libc::SIGKILL);
         }
-        #[cfg(windows)]
-        {
-            let _ = Command::new("taskkill")
-                .args(["/PID", &child.id().to_string(), "/T", "/F"])
-                .output();
-        }
         let _ = child.kill();
         let _ = child.wait();
     }
@@ -273,9 +262,7 @@ pub fn resolve_common(path: &str) -> Result<PathBuf, String> {
         directory,
         &["rev-parse", "--path-format=absolute", "--git-common-dir"],
     )?;
-    // Git for Windows rejects Rust's verbatim \\?\ path prefix. Dunce retains
-    // canonical identity while returning a conventional path where possible.
-    dunce::canonicalize(string(&result).trim()).map_err(|error| error.to_string())
+    std::fs::canonicalize(string(&result).trim()).map_err(|error| error.to_string())
 }
 
 fn validate_common(path: &str) -> Result<PathBuf, String> {
@@ -886,8 +873,8 @@ fn read_working_file(root: &Path, path: &str) -> Result<Vec<u8>, String> {
             .as_bytes()
             .to_vec());
     }
-    let canonical = dunce::canonicalize(&path).map_err(|error| error.to_string())?;
-    let canonical_root = dunce::canonicalize(root).map_err(|error| error.to_string())?;
+    let canonical = std::fs::canonicalize(&path).map_err(|error| error.to_string())?;
+    let canonical_root = std::fs::canonicalize(root).map_err(|error| error.to_string())?;
     if !canonical.starts_with(canonical_root) {
         return Err("File resolves outside this worktree".into());
     }
@@ -1097,9 +1084,9 @@ pub fn file_diff(request: &DiffRequest) -> Result<DiffResult, String> {
                     truncated: false,
                 });
             }
-            let canonical = dunce::canonicalize(&path).map_err(|error| error.to_string())?;
+            let canonical = std::fs::canonicalize(&path).map_err(|error| error.to_string())?;
             let canonical_root =
-                dunce::canonicalize(tree_path).map_err(|error| error.to_string())?;
+                std::fs::canonicalize(tree_path).map_err(|error| error.to_string())?;
             if !canonical.starts_with(&canonical_root) {
                 return Err("File resolves outside this worktree".into());
             }
@@ -1265,14 +1252,14 @@ fn branch_head(common: &Path, branch: &str) -> Result<String, String> {
 }
 
 fn registered_worktree(common: &Path, worktree: &str) -> Result<Worktree, String> {
-    let root = dunce::canonicalize(worktree).map_err(|error| error.to_string())?;
+    let root = std::fs::canonicalize(worktree).map_err(|error| error.to_string())?;
     let trees = parse_worktrees(&in_repo(
         common,
         &["worktree", "list", "--porcelain", "-z"],
     )?);
     let tree = trees
         .into_iter()
-        .find(|tree| dunce::canonicalize(&tree.path).is_ok_and(|path| path == root))
+        .find(|tree| std::fs::canonicalize(&tree.path).is_ok_and(|path| path == root))
         .ok_or("Worktree is not registered in this repository")?;
     if tree.bare || resolve_common(worktree)? != common {
         return Err("Select a working copy belonging to this repository".into());

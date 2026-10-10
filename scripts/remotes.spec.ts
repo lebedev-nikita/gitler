@@ -135,6 +135,7 @@ test("background fetch adds remote history without interrupting selection or sta
 });
 
 test("failed fetch preserves history and can be retried", async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 600 });
   await mockRemotes(page);
   await expect(page.locator("footer")).toContainText("Remotes updated");
   await page.evaluate(() => {
@@ -144,7 +145,9 @@ test("failed fetch preserves history and can be retried", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Remote update failed" })).toBeVisible();
   await expect(page.getByLabel("Diff for src/auth/session.ts")).toBeVisible();
   await page.getByRole("button", { name: "Remote update failed" }).click();
-  await expect(page.getByText("Network unavailable", { exact: true })).toBeVisible();
+  await page.clock.runFor(200);
+  await expect(page.getByText("Network unavailable", { exact: true })).toBeInViewport();
+  await expect(page.getByRole("button", { name: "Try again" })).toBeInViewport();
   await page.evaluate(() => {
     (window as unknown as { remoteFixture: { fail: boolean } }).remoteFixture.fail = false;
   });

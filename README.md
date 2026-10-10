@@ -5,7 +5,7 @@
 A desktop Git graph for developers working with many agents and worktrees. Open any
 folder in a repository and see its entire history, branches, tags, stashes, and
 uncommitted work across every registered worktree. Built with Tauri, React,
-TypeScript, and shadcn/ui.
+TypeScript, and shadcn/ui. Currently supported only on macOS with Apple Silicon.
 
 ## What it does
 
@@ -57,7 +57,7 @@ remotes and SSH aliases without a web hostname have no browser link.
 
 ## Download
 
-Install on macOS (Intel or Apple Silicon) with Homebrew:
+Install on macOS with Apple Silicon using Homebrew:
 
 ```sh
 brew install --cask jeff-business/tap/gitler
@@ -68,15 +68,16 @@ The [Homebrew tap](https://github.com/jeff-business/homebrew-tap) installs the a
 the `gitler` command, and Git. It tracks the newest published version, including
 release candidates. Upgrade with `brew update && brew upgrade --cask gitler`.
 
-Download other installers from [GitHub Releases](https://github.com/jeff-business/gitler/releases/latest).
-macOS (Intel and Apple Silicon), Windows (x64 and ARM64), and Linux (x64 and ARM64)
-are supported. Git must be installed and available on PATH. The initial releases
-use ad-hoc signing on macOS and no commercial signing certificate on Windows.
+The DMG and app archive are also available from
+[GitHub Releases](https://github.com/lebedev-nikita/gitler/releases/latest).
+Git must be installed and available on PATH. The app uses ad-hoc signing and is
+not notarized.
 
 ## Run
 
-Install [Bun](https://bun.sh), [Rust](https://rustup.rs), Git, and the
-[Tauri platform prerequisites](https://v2.tauri.app/start/prerequisites/).
+On a Mac with Apple Silicon, install [Bun](https://bun.sh),
+[Rust](https://rustup.rs), Git, and the
+[Tauri macOS prerequisites](https://v2.tauri.app/start/prerequisites/#macos).
 
 ```sh
 bun install --frozen-lockfile
@@ -108,14 +109,15 @@ Common commands are in `justfile`: `just dev`, `just build`, and `just check`.
 Git inspection lives in `src-tauri/src/git.rs`; the React interface is in `src/`.
 
 Version tags such as `v0.1.0` trigger the desktop release workflow. It tests and
-builds all six platform variants, attaches installers and SHA-256 checksums to a
-draft release, and publishes only after every platform succeeds.
+builds the macOS Apple Silicon app, attaches a DMG, app archive, and SHA-256
+checksums to a draft release, and publishes after both downloads are verified.
 After publication, it updates `Casks/gitler.rb` in the Homebrew tap and pushes the
-new version and both macOS archive checksums. The `HOMEBREW_TAP_TOKEN` Actions
-secret must contain a fine-grained token for `jeff-business/homebrew-tap` with
+new version and Apple Silicon archive checksum. The cask requires an ARM64 Mac.
+The `HOMEBREW_TAP_TOKEN` Actions secret must contain a fine-grained token for
+`jeff-business/homebrew-tap` with
 `Contents: Read and write` permission.
 
-Pushes to `main` and pull requests test and package every platform without
+Pushes to `main` and pull requests test and package the macOS Apple Silicon app without
 publishing. To measure the full build with a warmed cache, run
 `gh workflow run release.yml --ref main -f check_budget=true`; it fails if packaging
 takes more than three minutes. Releases check this limit automatically, including

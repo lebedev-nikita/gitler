@@ -1,4 +1,4 @@
-"""Create and publish a complete multi-platform GitHub release."""
+"""Create and publish a macOS Apple Silicon GitHub release."""
 
 import hashlib
 import json
@@ -60,19 +60,14 @@ def publish(tag):
     data = release(tag)
     if not data["isDraft"]:
         raise SystemExit("Release is already published")
-    expected = {
-        "macos-arm64": [".dmg", ".app.tar.gz"],
-        "macos-x64": [".dmg", ".app.tar.gz"],
-        "windows-x64": [".exe", ".msi"],
-        "windows-arm64": [".exe"],
-        "linux-x64": [".AppImage", ".deb", ".rpm"],
-        "linux-arm64": [".AppImage", ".deb", ".rpm"],
-    }
+    required = {f"Gitler_{app_version}_macos-arm64{suffix}" for suffix in (".dmg", ".app.tar.gz")}
     names = {asset["name"] for asset in data["assets"] if asset["size"] > 0}
-    required = {f"Gitler_{app_version}_{platform}{suffix}" for platform, suffixes in expected.items() for suffix in suffixes}
     missing = required - names
     if missing:
-        raise SystemExit(f"Missing platform downloads: {', '.join(sorted(missing))}")
+        raise SystemExit(f"Missing Apple Silicon downloads: {', '.join(sorted(missing))}")
+    unexpected = {asset["name"] for asset in data["assets"]} - required - {"SHA256SUMS.txt"}
+    if unexpected:
+        raise SystemExit(f"Unexpected release downloads: {', '.join(sorted(unexpected))}")
     with tempfile.TemporaryDirectory(prefix="gitler-release-") as directory:
         gh("release", "download", tag, "--dir", directory, "--pattern", "Gitler_*")
         lines = []
@@ -90,22 +85,30 @@ def publish(tag):
 
 
 def tap_cask(source, app_version, checksums):
-    hashes = {}
-    for arch in ("arm64", "x64"):
-        name = f"Gitler_{app_version}_macos-{arch}.app.tar.gz"
-        matches = re.findall(rf"^([0-9a-f]{{64}})  {re.escape(name)}$", checksums, re.M)
-        if len(matches) != 1:
-            raise SystemExit(f"Expected one SHA-256 checksum for {name}")
-        hashes[arch] = matches[0]
+    name = f"Gitler_{app_version}_macos-arm64.app.tar.gz"
+    matches = re.findall(rf"^([0-9a-f]{{64}})  {re.escape(name)}$", checksums, re.M)
+    if len(matches) != 1:
+        raise SystemExit(f"Expected one SHA-256 checksum for {name}")
+    # Migrate the existing dual-architecture cask, then accept the ARM-only layout
+    # on subsequent releases. Keep its livecheck, app, and CLI installation intact.
+    source, architectures = re.subn(r'^  arch arm: "arm64", intel: "x64"\n\n', '', source, flags=re.M)
     source, versions = re.subn(r'^  version "[^"\n]+"$', f'  version "{app_version}"', source, flags=re.M)
     source, digests = re.subn(
-        r'^  sha256 arm: +"[0-9a-f]{64}",\n +intel: "[0-9a-f]{64}"$',
-        f'  sha256 arm:   "{hashes["arm64"]}",\n         intel: "{hashes["x64"]}"',
+        r'^  sha256 ' + (r'arm: +"[0-9a-f]{64}",\n +intel: "[0-9a-f]{64}"' if architectures else r'"[0-9a-f]{64}"') + '$',
+        f'  sha256 "{matches[0]}"',
         source,
         flags=re.M,
     )
-    if versions != 1 or digests != 1:
-        raise SystemExit("Unexpected version or architecture checksums in Casks/gitler.rb")
+    source, urls = re.subn(
+        r'^(  url "https://github.com/[^/]+/gitler/releases/download/v#\{version\}/Gitler_#\{version\}_macos-)' + (r'#\{arch\}' if architectures else 'arm64') + r'(\.app\.tar\.gz")$',
+        r'\g<1>arm64\2', source, flags=re.M,
+    )
+    if architectures:
+        source, constraints = re.subn(r'^  depends_on :macos$', '  depends_on arch: :arm64\n  depends_on :macos', source, flags=re.M)
+    else:
+        constraints = len(re.findall(r'^  depends_on arch: :arm64$', source, re.M))
+    if architectures > 1 or versions != 1 or digests != 1 or urls != 1 or constraints != 1:
+        raise SystemExit("Unexpected version or architecture layout in Casks/gitler.rb")
     return source
 
 
