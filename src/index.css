@@ -16,6 +16,7 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--foreground);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--foreground);
@@ -31,21 +32,21 @@
   --color-tag: var(--tag);
   --color-added: var(--added);
   --color-removed: var(--removed);
-  --color-graph-hover: #213342;
-  --color-graph-selected: #294158;
-  --color-commit-node: #75b5f6;
-  --color-inspector: #1b2833;
-  --color-file-hover: #243847;
-  --color-file-selected: #2b4256;
-  --color-diff: #17232d;
-  --color-line-number: #9aadbd;
-  --color-diff-addition: #223c33;
-  --color-diff-addition-foreground: #c1ebd1;
-  --color-diff-deletion: #402e35;
-  --color-diff-deletion-foreground: #f1c2c7;
-  --color-diff-hunk: #23384a;
-  --color-diff-hunk-foreground: #a5c5e6;
-  --color-diff-truncated: #3d3428;
+  --color-graph-hover: #211c18;
+  --color-graph-selected: var(--accent);
+  --color-commit-node: #ff6a56;
+  --color-inspector: #191715;
+  --color-file-hover: #231f1b;
+  --color-file-selected: var(--accent);
+  --color-diff: #141312;
+  --color-line-number: #b7a99b;
+  --color-diff-addition: #2c3528;
+  --color-diff-addition-foreground: #d2e2bd;
+  --color-diff-deletion: #402825;
+  --color-diff-deletion-foreground: #ffd0c5;
+  --color-diff-hunk: #302b26;
+  --color-diff-hunk-foreground: #dfcbb0;
+  --color-diff-truncated: #3a3022;
   --radius-sm: 3px;
   --radius-md: 5px;
   --radius-lg: 7px;
@@ -56,29 +57,32 @@
 }
 :root {
   color-scheme: dark;
-  --background: #18232d;
-  --foreground: #e5edf4;
-  --card: #1d2a36;
-  --popover: #24323f;
-  --primary: #69c3b4;
-  --primary-foreground: #122b28;
-  --secondary: #243340;
-  --muted: #263746;
-  --muted-foreground: #a0b1c1;
-  --accent: #2a4054;
-  --destructive: #efa6ac;
-  --border: #334352;
-  --dirty: #e9b566;
-  --tag: #bfa5ef;
-  --added: #a0dfb8;
-  --removed: #edacb3;
+  --background: #161515;
+  --foreground: #f6eada;
+  --card: #1c1917;
+  --popover: #221e1b;
+  --primary: #ff5b49;
+  --primary-hover: #ff7768;
+  --primary-foreground: #161515;
+  --secondary: #231f1b;
+  --muted: #28231e;
+  --muted-foreground: #b9ad9e;
+  --accent: #2b1f1c;
+  --destructive: #ff9c8f;
+  --border: #38312b;
+  --dirty: #e8b96d;
+  --tag: #d9c3a2;
+  --added: #aec79a;
+  --removed: #ff9384;
+  --scrollbar: #594e43;
+  --scrollbar-hover: #776755;
   --radius: 7px;
 }
 @layer base {
   * {
     @apply border-border outline-ring/50;
     box-sizing: border-box;
-    scrollbar-color: #405261 transparent;
+    scrollbar-color: var(--scrollbar) transparent;
     scrollbar-width: thin;
   }
   html {
@@ -103,8 +107,8 @@
     outline-offset: -2px;
   }
   ::selection {
-    background: #365974;
-    color: var(--foreground);
+    background: var(--primary);
+    color: var(--primary-foreground);
   }
   input {
     caret-color: var(--primary);
@@ -121,12 +125,12 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #405261;
+    background: var(--scrollbar);
     border: 2px solid var(--background);
     border-radius: 4px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #5c7184;
+    background: var(--scrollbar-hover);
   }
 }
 @media (prefers-reduced-motion: reduce) {

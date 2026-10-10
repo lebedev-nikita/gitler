@@ -14,7 +14,7 @@ const badgeVariants = cva(
           "border-[color-mix(in_srgb,var(--ref-color,var(--primary)),transparent_65%)] bg-[color-mix(in_srgb,var(--ref-color,var(--primary)),transparent_92%)] text-[var(--ref-color,var(--primary))]",
         tag: "border-tag/25 bg-tag/10 text-tag",
         quiet: "border-border bg-secondary text-muted-foreground",
-        default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
+        default: "bg-primary text-primary-foreground [a]:hover:bg-primary-hover",
         secondary: "bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80",
         destructive:
           "bg-destructive/10 text-destructive focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:focus-visible:ring-destructive/40 [a]:hover:bg-destructive/20",

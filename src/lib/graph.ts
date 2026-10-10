@@ -1,7 +1,7 @@
 import type { Commit, Snapshot, Worktree } from "./models";
 
-export const LANE_COLORS = ["#75b5f6", "#b693ec", "#69c3b4", "#e49bb9", "#a4bc77", "#83c6df"];
-export const DIRTY_COLOR = "#e9b566";
+export const LANE_COLORS = ["#ff6a56", "#e8d8c2", "#b5bf8b", "#c3a8b1", "#c9ad94", "#e29a80"];
+export const DIRTY_COLOR = "#e8b96d";
 export const ROW_HEIGHT = 42;
 export const LANE_WIDTH = 19;
 
