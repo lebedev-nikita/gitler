@@ -1,7 +1,13 @@
 import { Context, Effect, Layer, ManagedRuntime, Schema } from "effect";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { DEMO_PATH, demoDetail, demoDiff, demoSnapshot } from "./demo";
-import { DetailSchema, DiffSchema, SnapshotSchema } from "./models";
+import {
+  BranchSuggestionSchema,
+  DiscardPlanSchema,
+  DetailSchema,
+  DiffSchema,
+  SnapshotSchema,
+} from "./models";
 import type {
   Comparison,
   Detail,
@@ -135,7 +141,56 @@ const loadDiff = Effect.fn("loadDiff")(function* (request: DiffRequest) {
   );
 });
 
+const action = Effect.fn("repositoryAction")(function* <A, I>(
+  commonDir: string,
+  command: string,
+  args: Record<string, unknown>,
+  schema: Schema.Codec<A, I>,
+) {
+  if (!desktop || isDemo(commonDir))
+    return yield* new RepositoryError({
+      message: "Open a local repository in the desktop app to use this action.",
+    });
+  const transport = yield* GitTransport;
+  const payload = yield* transport.call(command, { commonDir, ...args });
+  return yield* Schema.decodeUnknownEffect(schema)(payload).pipe(
+    Effect.mapError((error) => new RepositoryError({ message: error.message })),
+  );
+});
+
 export const repositoryApi = {
+  generateBranchName: (
+    commonDir: string,
+    branch: string,
+    worktree: string | null,
+    requestId: string,
+    codexPath: string,
+  ) =>
+    runtime.runPromise(
+      action(
+        commonDir,
+        "generate_branch_name",
+        { branch, worktree, requestId, codexPath: codexPath.trim() || null },
+        BranchSuggestionSchema,
+      ),
+    ),
+  cancelCodegen: (commonDir: string, requestId: string) =>
+    runtime.runPromise(action(commonDir, "cancel_codegen", { requestId }, Schema.Null)),
+  renameBranch: (commonDir: string, branch: string, newName: string, expectedHead: string) =>
+    runtime.runPromise(
+      action(commonDir, "rename_branch", { branch, newName, expectedHead }, Schema.Null),
+    ),
+  prepareDiscard: (commonDir: string, worktree: string) =>
+    runtime.runPromise(action(commonDir, "prepare_discard", { worktree }, DiscardPlanSchema)),
+  discardChanges: (
+    commonDir: string,
+    worktree: string,
+    expectedHead: string,
+    files: ReadonlyArray<{ path: string; token: string }>,
+  ) =>
+    runtime.runPromise(
+      action(commonDir, "discard_changes", { worktree, expectedHead, files }, Schema.Null),
+    ),
   open: (path: string): Promise<string | null> => {
     if (!desktop) return Promise.resolve(path);
     return runtime.runPromise(

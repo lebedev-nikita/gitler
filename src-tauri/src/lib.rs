@@ -1,3 +1,4 @@
+mod codex;
 pub mod git;
 mod launcher;
 mod windows;
@@ -108,6 +109,71 @@ async fn resolve_commit(common_dir: String, revision: String) -> Result<String, 
         .map_err(|error| error.to_string())?
 }
 
+#[tauri::command]
+async fn generate_branch_name(
+    jobs: tauri::State<'_, codex::Jobs>,
+    request_id: String,
+    common_dir: String,
+    branch: String,
+    worktree: Option<String>,
+    codex_path: Option<String>,
+) -> Result<codex::BranchSuggestion, String> {
+    let cancelled = jobs.start(&request_id)?;
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        codex::generate(
+            &common_dir,
+            &branch,
+            worktree.as_deref(),
+            codex_path.as_deref(),
+            cancelled,
+        )
+    })
+    .await
+    .map_err(|error| error.to_string());
+    jobs.finish(&request_id);
+    result?
+}
+
+#[tauri::command]
+fn cancel_codegen(jobs: tauri::State<codex::Jobs>, request_id: String) {
+    jobs.cancel(&request_id);
+}
+
+#[tauri::command]
+async fn rename_branch(
+    common_dir: String,
+    branch: String,
+    new_name: String,
+    expected_head: String,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git::rename_branch(&common_dir, &branch, &new_name, &expected_head)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn prepare_discard(common_dir: String, worktree: String) -> Result<git::DiscardPlan, String> {
+    tauri::async_runtime::spawn_blocking(move || git::prepare_discard(&common_dir, &worktree))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn discard_changes(
+    common_dir: String,
+    worktree: String,
+    expected_head: String,
+    files: Vec<git::DiscardSelection>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git::discard_changes(&common_dir, &worktree, &expected_head, &files)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
 pub fn run() {
     let args: Vec<String> = std::env::args().collect();
     let cwd = std::env::current_dir().unwrap_or_default();
@@ -148,6 +214,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(LaunchPath(Mutex::new(initial.clone())))
         .manage(RepositoryWindows::default())
+        .manage(codex::Jobs::default())
         .setup(move |app| {
             if let Some(path) = &initial {
                 // Invalid paths are reported by the window's normal open dialog.
@@ -167,7 +234,12 @@ pub fn run() {
             commit_detail,
             worktree_detail,
             resolve_commit,
-            file_diff
+            file_diff,
+            generate_branch_name,
+            cancel_codegen,
+            rename_branch,
+            prepare_discard,
+            discard_changes
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Gitler");

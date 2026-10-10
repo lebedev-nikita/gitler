@@ -14,6 +14,8 @@ TypeScript, and shadcn/ui.
 - Inspects staged, unstaged, and untracked files without switching branches.
 - Compares two commits or a commit and a worktree's current files: select one node,
   right-click another, and choose **Diff with selected**. The diff opens on the right.
+- Suggests local branch names with your installed Codex CLI, then lets you review and apply the rename.
+- Discards selected staged, unstaged, and untracked files in a chosen working copy after confirmation.
 - Filters and searches loaded history; loads older commits on demand.
 - Opens different repositories in separate windows, with at most one window per
   repository, including all of its worktrees.
@@ -23,9 +25,17 @@ labels; filters appear only when you open **Filters**. To inspect or compare a
 commit outside the loaded history, enter its hash in search and press Enter. It
 stays in the graph for selection and right-click comparisons.
 
-This initial version is read-only. Git mutations such as checkout, commit, reset,
-merge, push, and stash apply are intentionally outside its scope. Git Graph is the
-functional reference; this is not a complete replacement for all of its actions.
+Right-click a local branch label, its tip commit, or an uncommitted node to rename
+the branch with Codex or discard its working changes. Renaming requires a current
+[Codex CLI](https://developers.openai.com/codex/cli) installation and `codex login`;
+Gitler detects common installation paths and accepts an explicit executable path.
+The selected branch's commits and working diffs are sent to Codex for generation.
+The suggested name is editable before applying a local rename; remote names are unchanged.
+
+Discarding restores selected files to HEAD in both the index and working copy.
+Selected untracked and newly added files are deleted permanently. Gitler verifies
+that the reviewed files and HEAD have not changed; submodules and nested repositories
+must be handled separately. Other Git mutations remain outside the application's scope.
 
 ## Download
 

@@ -119,3 +119,23 @@ export function worktreeCounts(tree: Worktree) {
     untracked: tree.files.filter((file) => file.indexStatus === "?").length,
   };
 }
+
+export const BranchSuggestionSchema = Schema.Struct({
+  branchName: Schema.String,
+  head: Schema.String,
+});
+export type BranchSuggestion = typeof BranchSuggestionSchema.Type;
+
+export const DiscardFileSchema = Schema.Struct({
+  ...FileChangeSchema.fields,
+  token: Schema.String,
+  unavailable: Schema.NullOr(Schema.String),
+});
+export const DiscardPlanSchema = Schema.Struct({
+  head: Schema.String,
+  files: Schema.Array(DiscardFileSchema),
+});
+export type DiscardPlan = typeof DiscardPlanSchema.Type;
+export type GraphAction =
+  | { kind: "rename"; branch: string; worktree: string | null }
+  | { kind: "discard"; worktree: string };

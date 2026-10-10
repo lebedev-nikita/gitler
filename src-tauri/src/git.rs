@@ -1065,3 +1065,438 @@ pub fn file_diff(request: &DiffRequest) -> Result<DiffResult, String> {
         truncated,
     })
 }
+
+// Serialize the app's mutations; scans continue to use optional-lock-free reads.
+static MUTATIONS: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BranchContext {
+    pub head: String,
+    pub text: String,
+}
+
+pub(crate) fn validate_branch(branch: &str) -> Result<(), String> {
+    if branch.is_empty() || branch.starts_with('-') || branch == "HEAD" {
+        return Err("Enter a valid local branch name".into());
+    }
+    let mut command = git_command();
+    command.args(["check-ref-format", &format!("refs/heads/{branch}")]);
+    execute(command)
+        .map(|_| ())
+        .map_err(|_| "Enter a valid local branch name".into())
+}
+
+fn branch_head(common: &Path, branch: &str) -> Result<String, String> {
+    validate_branch(branch)?;
+    let output = in_repo(
+        common,
+        &["rev-parse", "--verify", &format!("refs/heads/{branch}")],
+    )?;
+    let head = string(&output).trim().to_string();
+    valid_oid(&head)?;
+    Ok(head)
+}
+
+fn registered_worktree(common: &Path, worktree: &str) -> Result<Worktree, String> {
+    let root = dunce::canonicalize(worktree).map_err(|error| error.to_string())?;
+    let trees = parse_worktrees(&in_repo(
+        common,
+        &["worktree", "list", "--porcelain", "-z"],
+    )?);
+    let tree = trees
+        .into_iter()
+        .find(|tree| dunce::canonicalize(&tree.path).is_ok_and(|path| path == root))
+        .ok_or("Worktree is not registered in this repository")?;
+    if tree.bare || resolve_common(worktree)? != common {
+        return Err("Select a working copy belonging to this repository".into());
+    }
+    Ok(tree)
+}
+
+pub fn branch_context(
+    common_dir: &str,
+    branch: &str,
+    worktree: Option<&str>,
+) -> Result<BranchContext, String> {
+    let common = validate_common(common_dir)?;
+    let head = branch_head(&common, branch)?;
+    let reference = format!("refs/heads/{branch}");
+    let default = in_repo(&common, &["symbolic-ref", "refs/remotes/origin/HEAD"])
+        .ok()
+        .map(|bytes| string(&bytes).trim().to_string());
+    let candidates = default.into_iter().chain([
+        "refs/heads/main".into(),
+        "refs/heads/master".into(),
+        "refs/remotes/origin/main".into(),
+        "refs/remotes/origin/master".into(),
+    ]);
+    let base = candidates
+        .filter(|candidate| candidate != &reference)
+        .find_map(|candidate| {
+            let target = in_repo(&common, &["rev-parse", "--verify", &candidate]).ok()?;
+            if string(&target).trim() == head {
+                return None;
+            }
+            in_repo(&common, &["merge-base", &head, &candidate])
+                .ok()
+                .map(|bytes| string(&bytes).trim().to_string())
+        });
+    // With no distinct mainline, describe the tip commit rather than all shared history.
+    let base = base.or_else(|| {
+        in_repo(&common, &["rev-parse", "--verify", &format!("{head}^")])
+            .ok()
+            .map(|bytes| string(&bytes).trim().to_string())
+    });
+    let range = base
+        .as_ref()
+        .map(|base| format!("{base}..{head}"))
+        .unwrap_or_else(|| head.clone());
+    let mut text = format!(
+        "Current branch: {branch}\nHEAD: {head}\nCommits:\n{}\nCommitted patch:\n",
+        string(&in_repo(
+            &common,
+            &["log", "-80", "--format=%s%n%b", &range, "--",]
+        )?)
+    );
+    let patch = if let Some(base) = base.as_deref() {
+        in_repo(
+            &common,
+            &[
+                "diff",
+                "--no-ext-diff",
+                "--no-textconv",
+                "--no-color",
+                base,
+                &head,
+                "--",
+            ],
+        )?
+    } else {
+        in_repo(
+            &common,
+            &[
+                "show",
+                "--format=",
+                "--no-ext-diff",
+                "--no-textconv",
+                "--no-color",
+                &head,
+                "--",
+            ],
+        )?
+    };
+    text.push_str(&string(&patch[..patch.len().min(192 * 1024)]));
+    if patch.len() > 192 * 1024 {
+        text.push_str("\n[Committed patch truncated]\n");
+    }
+    let trees = parse_worktrees(&in_repo(
+        &common,
+        &["worktree", "list", "--porcelain", "-z"],
+    )?);
+    let working = if let Some(path) = worktree {
+        let tree = registered_worktree(&common, path)?;
+        if tree.branch.as_deref() != Some(branch) || tree.head != head {
+            return Err("The worktree's branch changed. Refresh and try again.".into());
+        }
+        Some(tree)
+    } else {
+        trees
+            .into_iter()
+            .find(|tree| tree.branch.as_deref() == Some(branch) && !tree.bare)
+    };
+    if let Some(tree) = working {
+        let detail = worktree_detail(common_dir, &tree.path, None)?;
+        text.push_str("\nUncommitted files (index + working copy):\n");
+        for file in &detail.files {
+            text.push_str(&format!(
+                "{}{} {}\n",
+                file.index_status, file.worktree_status, file.path
+            ));
+        }
+        for file in &detail.files {
+            if text.len() >= 320 * 1024 {
+                text.push_str("\n[Remaining working patches omitted]\n");
+                break;
+            }
+            let request = DiffRequest {
+                common_dir: common_dir.into(),
+                path: file.path.clone(),
+                old_path: file.old_path.clone(),
+                oid: None,
+                base: None,
+                worktree: Some(tree.path.clone()),
+                mode: if file.index_status == "?" {
+                    "untracked"
+                } else {
+                    "combined"
+                }
+                .into(),
+                reverse: false,
+            };
+            match file_diff(&request) {
+                Ok(patch) => {
+                    text.push_str(&string(
+                        &patch.text.as_bytes()[..patch.text.len().min(32 * 1024)],
+                    ));
+                    if patch.truncated || patch.text.len() > 32 * 1024 {
+                        text.push_str("\n[File patch truncated]\n");
+                    }
+                }
+                Err(_) => text.push_str("[File contents unavailable]\n"),
+            }
+        }
+    }
+    Ok(BranchContext { head, text })
+}
+
+pub fn rename_branch(
+    common_dir: &str,
+    branch: &str,
+    new_name: &str,
+    expected_head: &str,
+) -> Result<(), String> {
+    let _guard = MUTATIONS
+        .lock()
+        .map_err(|_| "Git mutation lock unavailable")?;
+    let common = validate_common(common_dir)?;
+    validate_branch(new_name)?;
+    if branch_head(&common, branch)? != expected_head {
+        return Err("The branch moved since the name was generated. Generate a new name.".into());
+    }
+    if branch == new_name {
+        return Err("Choose a different branch name".into());
+    }
+    // -m refuses collisions and preserves reflogs, upstream settings and worktree HEADs.
+    in_repo(&common, &["branch", "-m", "--", branch, new_name]).map(|_| ())
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscardFile {
+    #[serde(flatten)]
+    pub file: FileChange,
+    pub token: String,
+    pub unavailable: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscardPlan {
+    pub head: String,
+    pub files: Vec<DiscardFile>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DiscardSelection {
+    pub path: String,
+    pub token: String,
+}
+
+fn safe_mutation_path(root: &Path, path: &str) -> Result<PathBuf, String> {
+    validate_file_path(path)?;
+    let relative = Path::new(path);
+    if relative.components().any(|part| {
+        part.as_os_str()
+            .to_string_lossy()
+            .eq_ignore_ascii_case(".git")
+    }) {
+        return Err("Git metadata cannot be discarded".into());
+    }
+    let mut parent = root.to_path_buf();
+    for part in relative.parent().unwrap_or(Path::new("")).components() {
+        parent.push(part.as_os_str());
+        match std::fs::symlink_metadata(&parent) {
+            Ok(metadata) if metadata.is_dir() && !metadata.file_type().is_symlink() => {}
+            Ok(_) => return Err("A parent path is not a regular directory".into()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => break,
+            Err(error) => return Err(error.to_string()),
+        }
+    }
+    Ok(root.join(relative))
+}
+
+fn discard_token(
+    common: &Path,
+    root: &Path,
+    head: &str,
+    file: &FileChange,
+) -> Result<String, String> {
+    use sha2::{Digest, Sha256};
+    let mut digest = Sha256::new();
+    digest.update(head);
+    digest.update(serde_json::to_vec(file).map_err(|error| error.to_string())?);
+    for path in std::iter::once(file.path.as_str()).chain(file.old_path.as_deref()) {
+        let absolute = safe_mutation_path(root, path)?;
+        let index = in_worktree(root, &["ls-files", "--stage", "-z", "--", path])?;
+        let historical = in_repo(common, &["ls-tree", "-z", head, "--", path])?;
+        if index
+            .split(|byte| *byte == 0)
+            .chain(historical.split(|byte| *byte == 0))
+            .any(|entry| entry.starts_with(b"160000 "))
+        {
+            return Err("Open the submodule separately to discard its changes".into());
+        }
+        digest.update(index);
+        digest.update(historical);
+        match std::fs::symlink_metadata(&absolute) {
+            Ok(metadata) => {
+                if !metadata.is_file() && !metadata.file_type().is_symlink() {
+                    return Err(
+                        "Directories and nested repositories cannot be discarded here".into(),
+                    );
+                }
+                digest.update(format!(
+                    "{:?}:{}:{}",
+                    metadata.file_type(),
+                    metadata.len(),
+                    metadata.permissions().readonly()
+                ));
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    digest.update(metadata.permissions().mode().to_le_bytes());
+                }
+                digest.update(read_working_file(root, path)?);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                digest.update(b"missing");
+            }
+            Err(error) => return Err(error.to_string()),
+        }
+    }
+    Ok(format!("{:x}", digest.finalize()))
+}
+
+pub fn prepare_discard(common_dir: &str, worktree: &str) -> Result<DiscardPlan, String> {
+    let common = validate_common(common_dir)?;
+    let tree = registered_worktree(&common, worktree)?;
+    valid_oid(&tree.head)?;
+    if tree.head.bytes().all(|byte| byte == b'0') {
+        return Err("Create an initial commit before discarding changes".into());
+    }
+    let detail = worktree_detail(common_dir, &tree.path, None)?;
+    let files = detail
+        .files
+        .into_iter()
+        .map(|file| {
+            let token = discard_token(&common, Path::new(&tree.path), &tree.head, &file);
+            let (token, unavailable) = match token {
+                Ok(token) => (token, None),
+                Err(error) => (String::new(), Some(error)),
+            };
+            DiscardFile {
+                file,
+                token,
+                unavailable,
+            }
+        })
+        .collect();
+    Ok(DiscardPlan {
+        head: tree.head,
+        files,
+    })
+}
+
+pub fn discard_changes(
+    common_dir: &str,
+    worktree: &str,
+    expected_head: &str,
+    files: &[DiscardSelection],
+) -> Result<(), String> {
+    let _guard = MUTATIONS
+        .lock()
+        .map_err(|_| "Git mutation lock unavailable")?;
+    if files.is_empty() {
+        return Err("Select at least one changed file".into());
+    }
+    let common = validate_common(common_dir)?;
+    let tree = registered_worktree(&common, worktree)?;
+    let plan = prepare_discard(common_dir, &tree.path)?;
+    if plan.head != expected_head {
+        return Err("HEAD changed. Reopen the discard dialog to review the current files.".into());
+    }
+    let mut selected = std::collections::BTreeSet::new();
+    let mut tracked = std::collections::BTreeSet::new();
+    let mut untracked = Vec::new();
+    for selection in files {
+        if !selected.insert(selection.path.clone()) {
+            return Err("A file was selected twice".into());
+        }
+        let current = plan
+            .files
+            .iter()
+            .find(|file| file.file.path == selection.path)
+            .ok_or(
+                "A selected file changed. Reopen the discard dialog to review the current files.",
+            )?;
+        if current.unavailable.is_some()
+            || current.token.is_empty()
+            || current.token != selection.token
+        {
+            return Err(format!(
+                "{} changed or cannot be discarded. Reopen the dialog to review it.",
+                selection.path
+            ));
+        }
+        if current.file.index_status == "?" {
+            untracked.push((
+                selection.path.clone(),
+                safe_mutation_path(Path::new(&tree.path), &selection.path)?,
+            ));
+        } else {
+            tracked.insert(selection.path.clone());
+            if current.file.index_status == "R" || current.file.worktree_status == "R" {
+                if let Some(old) = &current.file.old_path {
+                    tracked.insert(old.clone());
+                }
+            }
+        }
+    }
+    for path in &tracked {
+        if plan.files.iter().any(|file| file.file.path == *path) && !selected.contains(path) {
+            return Err(format!("{path} has separate changes at the rename source. Select both files to discard the rename."));
+        }
+    }
+    if !tracked.is_empty() {
+        let mut pathspecs = tempfile::NamedTempFile::new().map_err(|error| error.to_string())?;
+        use std::io::Write;
+        for path in &tracked {
+            pathspecs
+                .write_all(path.as_bytes())
+                .and_then(|_| pathspecs.write_all(&[0]))
+                .map_err(|error| error.to_string())?;
+        }
+        pathspecs.flush().map_err(|error| error.to_string())?;
+        let mut command = git_command();
+        command
+            .arg("-C")
+            .arg(&tree.path)
+            .args([
+                "restore",
+                "--staged",
+                "--worktree",
+                "--no-recurse-submodules",
+            ])
+            .arg(format!("--source={expected_head}"))
+            .arg(format!(
+                "--pathspec-from-file={}",
+                pathspecs.path().to_string_lossy()
+            ))
+            .arg("--pathspec-file-nul");
+        execute(command)?;
+    }
+    for (relative, path) in untracked {
+        if tracked.contains(&relative) {
+            continue;
+        }
+        // Never recursively delete a directory (including nested repositories).
+        std::fs::remove_file(&path).map_err(|error| {
+            format!(
+                "Could not remove {}: {error}. Refresh to inspect the remaining changes.",
+                path.display()
+            )
+        })?;
+    }
+    Ok(())
+}

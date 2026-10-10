@@ -194,11 +194,11 @@ Controls have modest corners (`md`); graph labels and file selections are tighte
 
 **Badges and status.** Branch badges combine a faint lane-colored fill and stroke; dirty and tag badges use their semantic colors. Remote labels use a neutral outline, while quiet badges use a neutral filled surface. Dirty, connected, and unavailable states pair colored dots with text.
 
-**History graph.** Aligned graph, message, author, and date columns form one selectable row. Hover adds a subtle blue-gray fill; selection and comparison use a stronger blue fill. Working rows retain an amber wash and attach their branch and file count beside the subject. Right-click comparison actions open the same inspector used for selection.
+**History graph.** Aligned graph, message, author, and date columns form one selectable row. Hover adds a subtle blue-gray fill; selection and comparison use a stronger blue fill. Working rows retain an amber wash and attach their branch and file count beside the subject. Right-click comparison actions open the same inspector used for selection. Branch labels target their own local branch when several share a tip. Rename and discard actions open focused review dialogs.
 
 **Inspector and patch.** The inset surface groups a compact summary, optional metadata, changed-file rows, and a patch. The active file has a blue selection fill. Working-copy modes form one joined toggle group with a muted selected segment. A neutral file header precedes green additions, rose deletions, and blue hunk rows; status letters, signs, and line numbers preserve meaning beyond color.
 
-**Transient surfaces.** Context menus use the popover surface, compact rounded items, and visible focus fill. Dialogs use the same material with larger corners and short title/description text. Containers remain flat rather than introducing a separate card grid.
+**Transient surfaces.** Context menus use the popover surface, compact rounded items, and visible focus fill. Dialogs use the same material with larger corners and short title/description text. Rename dialogs show an editable Codex suggestion, regeneration and cancellation, with executable options collapsed. Discard dialogs show the working-copy path and a scrollable file checklist, followed by a destructive action naming the selection count. Containers remain flat rather than introducing a separate card grid.
 
 ## Do's and Don'ts
 

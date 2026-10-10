@@ -1281,12 +1281,13 @@ dependencies = [
 
 [[package]]
 name = "gitler"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "dunce",
  "libc",
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",

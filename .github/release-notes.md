@@ -1,16 +1,11 @@
-Gitler is a read-only desktop Git graph for repositories with many branches and working copies.
-
-Gitler 0.2.0 is the stable release of repository windows and checkpoint filtering.
+Gitler 0.2.1 adds branch naming with Codex and selective cleanup of working changes.
 
 ## Changes
 
-- Return control to the terminal immediately when launching `gitler`, while the application keeps running independently. Relative paths and repeated launches preserve repository window behavior.
-- Hide T3 Code checkpoints from the commit graph and hash navigation. Checkpoints remain available to T3 Code for restoring files.
-- Keep checkpoint snapshots out of history limits while preserving every registered worktree, including detached HEADs.
-- Open different repositories in separate windows from the GUI or CLI, with at most one window per repository.
-- Bring an already open repository to the front without resetting its selection or diff. Paths through worktrees, nested folders, and symlinks reuse the same window.
-- Show the repository name in each window's title.
-- Fix Windows MSI packaging for release candidates by using a numeric installer version.
+- Right-click a local branch label, its tip commit, or a working-change node to generate a branch name from committed and uncommitted changes using your installed Codex CLI. Review or edit the suggestion before applying the local rename. Upstream configuration is preserved.
+- Discard selected uncommitted files from the graph's context menu. Restore staged and unstaged changes to HEAD, and delete selected untracked or newly added files after confirmation. Other files and worktrees are preserved.
+- Reject stale discard previews and branch tips. Keep nested repositories and submodules out of destructive cleanup.
+- Cancel an in-progress Codex generation when its dialog closes. Detect common Codex installation paths, with an optional executable override.
 
 ## Downloads
 
@@ -23,4 +18,4 @@ Gitler 0.2.0 is the stable release of repository windows and checkpoint filterin
 
 Choose the asset matching your operating system and processor. `SHA256SUMS.txt` contains checksums for every download.
 
-Git must be installed and available on PATH. Linux builds require a graphical desktop; DEB and RPM packages declare their runtime dependencies. The initial macOS builds use ad-hoc signing and are not notarized. Windows builds do not have a commercial code-signing certificate.
+Git must be installed and available on PATH. Branch-name generation also requires a current Codex CLI installation signed in with `codex login`. Discarding selected untracked and newly added files deletes them permanently. The macOS builds use ad-hoc signing and are not notarized; Windows builds do not have a commercial code-signing certificate.

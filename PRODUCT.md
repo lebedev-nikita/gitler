@@ -28,10 +28,10 @@ The application opens from the GUI or CLI using any path inside the repository.
 ## Capabilities and Constraints
 
 Repository-wide navigation independent of the currently checked-out branch. Git Graph is the functional reference.
-The initial version minimizes mutations and focuses on inspection. The interface language is English.
+Mutations are limited to reviewed local branch renames and confirmed selected-file discards. The interface language is English.
 Worktrees are part of branches, never a separate top-level concept. The user requested a
 minimal interface with no left branch panel and filters exposed only as needed.
-Open decisions: later mutation scope and full Git Graph feature parity.
+Open decisions: broader mutation scope and full Git Graph feature parity.
 
 ## Brand Commitments
 

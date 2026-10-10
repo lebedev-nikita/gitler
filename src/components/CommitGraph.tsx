@@ -6,6 +6,8 @@ import {
   GitFork,
   Search,
   SlidersHorizontal,
+  Sparkles,
+  Trash2,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,7 +25,7 @@ import {
 } from "@/components/ui/context-menu";
 import { ancestorIds, layoutGraph, LANE_WIDTH, repositoryNodes, ROW_HEIGHT } from "@/lib/graph";
 import type { GraphRow } from "@/lib/graph";
-import type { Comparison, Selection, Snapshot } from "@/lib/models";
+import type { Comparison, GraphAction, Selection, Snapshot } from "@/lib/models";
 import { selectionId } from "@/lib/models";
 import { cn } from "@/lib/utils";
 import { dateLabel, EmptyMessage, shortHash } from "./common";
@@ -82,6 +84,7 @@ export function CommitGraph({
   busy,
   searchRef,
   jump,
+  act,
 }: {
   snapshot: Snapshot;
   selected: Selection | null;
@@ -92,7 +95,9 @@ export function CommitGraph({
   busy: boolean;
   searchRef: React.RefObject<HTMLInputElement | null>;
   jump: (hash: string) => Promise<void>;
+  act: (action: GraphAction) => void;
 }) {
+  const [menuBranch, setMenuBranch] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [branch, setBranch] = useState("all");
   const [onlyChanges, setOnlyChanges] = useState(false);
@@ -334,6 +339,25 @@ export function CommitGraph({
               const inComparison =
                 comparison &&
                 [selectionId(comparison.from), selectionId(comparison.to)].includes(row.node.id);
+              const localBranches = row.node.worktree
+                ? row.node.worktree.branch
+                  ? [row.node.worktree.branch]
+                  : []
+                : refsFor(row.node.id)
+                    .filter((ref) => ref.kind === "branch")
+                    .map((ref) => ref.name);
+              const branches = menuBranch
+                ? localBranches.filter((name) => name === menuBranch)
+                : localBranches;
+              const workingCopies = row.node.worktree
+                ? [row.node.worktree]
+                : snapshot.worktrees.filter(
+                    (tree) =>
+                      tree.head === row.node.id && (!menuBranch || tree.branch === menuBranch),
+                  );
+              const dirtyCopies = workingCopies.filter(
+                (tree) => tree.files.length > 0 && !tree.error && !tree.bare,
+              );
               return (
                 <div
                   className="graph-row-position"
@@ -358,6 +382,13 @@ export function CommitGraph({
                       aria-pressed={!!isSelected}
                       data-node-id={row.node.id}
                       tabIndex={isSelected ? 0 : -1}
+                      onContextMenu={(event) => {
+                        const target = event.target as HTMLElement;
+                        setMenuBranch(
+                          target.closest<HTMLElement>("[data-local-branch]")?.dataset.localBranch ??
+                            null,
+                        );
+                      }}
                       onClick={(event) => {
                         if ((event.metaKey || event.ctrlKey) && canCompare(selection)) {
                           compare(selection);
@@ -372,7 +403,10 @@ export function CommitGraph({
                         <span className="graph-refs">
                           {row.node.worktree ? (
                             <>
-                              <Badge variant="dirty">
+                              <Badge
+                                variant="dirty"
+                                data-local-branch={row.node.worktree.branch ?? undefined}
+                              >
                                 {row.node.worktree.branch ?? "Detached HEAD"}
                               </Badge>
                               <span className="dirty-file-count">
@@ -385,6 +419,7 @@ export function CommitGraph({
                               .map((ref) => (
                                 <Badge
                                   key={ref.fullName}
+                                  data-local-branch={ref.kind === "branch" ? ref.name : undefined}
                                   style={{ "--ref-color": row.color } as React.CSSProperties}
                                   variant={
                                     ref.kind === "tag"
@@ -423,6 +458,44 @@ export function CommitGraph({
                           Inspect {row.node.worktree ? "changes" : "commit"}
                         </ContextMenuItem>
                       </ContextMenuGroup>
+                      {(branches.length > 0 || dirtyCopies.length > 0) && (
+                        <>
+                          <ContextMenuSeparator />
+                          <ContextMenuGroup>
+                            {branches.map((branch) => (
+                              <ContextMenuItem
+                                key={branch}
+                                onClick={() =>
+                                  act({
+                                    kind: "rename",
+                                    branch,
+                                    worktree:
+                                      workingCopies.find((tree) => tree.branch === branch)?.path ??
+                                      null,
+                                  })
+                                }
+                              >
+                                <Sparkles />
+                                {branches.length === 1
+                                  ? "Regenerate branch name with Codex…"
+                                  : `Regenerate ${branch} with Codex…`}
+                              </ContextMenuItem>
+                            ))}
+                            {dirtyCopies.map((tree) => (
+                              <ContextMenuItem
+                                key={tree.path}
+                                variant="destructive"
+                                onClick={() => act({ kind: "discard", worktree: tree.path })}
+                              >
+                                <Trash2 />
+                                {dirtyCopies.length === 1
+                                  ? "Discard uncommitted changes…"
+                                  : `Discard changes on ${tree.branch ?? tree.path}…`}
+                              </ContextMenuItem>
+                            ))}
+                          </ContextMenuGroup>
+                        </>
+                      )}
                       <ContextMenuSeparator />
                       <ContextMenuGroup>
                         <ContextMenuItem

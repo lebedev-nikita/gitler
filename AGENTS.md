@@ -1,7 +1,9 @@
 # Gitler
 
-Git operations live in `src-tauri/src/git.rs`. Keep them read-only and resolve
-repositories by their common Git directory, including every registered worktree.
+Git operations live in `src-tauri/src/git.rs`. Resolve repositories by their common
+Git directory, including every registered worktree. Inspection stays read-only;
+mutations are limited to explicit local branch renames and confirmed, selected-file
+discards. Validate repository ownership and stale previews before changing files.
 
 # Learning more about Effect
 

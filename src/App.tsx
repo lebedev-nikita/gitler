@@ -14,7 +14,6 @@ import {
   GitFork,
   Info,
   LoaderCircle,
-  LockKeyhole,
   RefreshCw,
   Terminal,
 } from "lucide-react";
@@ -32,12 +31,13 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { CommitGraph } from "@/components/CommitGraph";
+import { GraphActions } from "@/components/GraphActions";
 import { Inspector } from "@/components/Inspector";
 import { CopyButton, ErrorMessage, Loading, shortHash, shortPath } from "@/components/common";
 import { DEMO_PATH } from "@/lib/demo";
 import { desktop, isDemo, repositoryApi } from "@/lib/repository";
 import { selectionId } from "@/lib/models";
-import type { Commit, Comparison, Selection } from "@/lib/models";
+import type { Commit, Comparison, GraphAction, Selection } from "@/lib/models";
 import { mergeCommitHistory } from "@/lib/graph";
 
 function savedPath() {
@@ -56,6 +56,7 @@ export default function App() {
   const [comparison, setComparison] = useState<Comparison | null>(null);
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
+  const [graphAction, setGraphAction] = useState<GraphAction | null>(null);
   const [infoDialog, setInfoDialog] = useState(false);
   const [shortcutsDialog, setShortcutsDialog] = useState(false);
   const [inputPath, setInputPath] = useState("");
@@ -108,6 +109,7 @@ export default function App() {
         });
         if (sequence !== requestSequence.current) return;
         loadedPath.current = target;
+        setGraphAction(null);
         setPath(target);
         setLimit(400);
         setComparison(null);
@@ -231,10 +233,6 @@ export default function App() {
         </Button>
         {demo && <Badge variant="outline">Demo</Badge>}
         <div className="toolbar-spacer" />
-        <Badge variant="quiet">
-          <LockKeyhole />
-          Read only
-        </Badge>
         <Button
           variant="outline"
           size="sm"
@@ -354,6 +352,7 @@ export default function App() {
               select={select}
               compare={compare}
               comparison={comparison}
+              act={setGraphAction}
               busy={repository.isFetching}
               loadMore={() => setLimit((value) => Math.min(value + 1000, 20000))}
               searchRef={searchRef}
@@ -398,6 +397,29 @@ export default function App() {
             )}
           </div>
         </>
+      )}
+      {snapshot && graphAction && (
+        <GraphActions
+          key={snapshot.commonDir + JSON.stringify(graphAction)}
+          action={graphAction}
+          snapshot={snapshot}
+          close={() => setGraphAction(null)}
+          changed={async () => {
+            await queryClient.invalidateQueries({ queryKey: ["repository"] });
+            await queryClient.invalidateQueries({ queryKey: ["detail"] });
+            await queryClient.invalidateQueries({ queryKey: ["diff"] });
+            if (
+              graphAction.kind === "discard" &&
+              selected?.kind === "worktree" &&
+              selected.path === graphAction.worktree
+            ) {
+              const fresh = await repository.refetch();
+              const tree = fresh.data?.worktrees.find((tree) => tree.path === graphAction.worktree);
+              if (tree && tree.files.length === 0 && !/^0+$/.test(tree.head))
+                select({ kind: "commit", oid: tree.head });
+            }
+          }}
+        />
       )}
       <footer className="app-statusbar">
         <span>
@@ -586,7 +608,8 @@ export default function App() {
           <DialogHeader>
             <DialogTitle>Move through your repository</DialogTitle>
             <DialogDescription>
-              Inspect freely. Every Git operation in Gitler is read-only.
+              Inspect history, rename local branches with Codex, and discard selected working
+              changes from the graph’s context menu.
             </DialogDescription>
           </DialogHeader>
           <div className="shortcut-list">
