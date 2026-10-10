@@ -28,13 +28,21 @@ def release(tag):
     return json.loads(gh("release", "view", tag, "--json", "apiUrl,isDraft,assets,targetCommitish,url"))
 
 
+def channel_flags(app_version):
+    prerelease = "-" in app_version.split("+", 1)[0]
+    return (
+        f"--prerelease={str(prerelease).lower()}",
+        f"--latest={str(not prerelease).lower()}",
+    )
+
+
 def prepare(tag):
-    version(tag)
+    app_version = version(tag)
     # The tag must already exist; never create a release from an implicit branch head.
     gh("api", f"repos/{os.environ['GITHUB_REPOSITORY']}/git/ref/tags/{tag}")
     existing = subprocess.run(["gh", "release", "view", tag], capture_output=True)
     if existing.returncode:
-        gh("release", "create", tag, "--verify-tag", "--draft", "--title", f"Gitler {tag[1:]}", "--notes-file", ".github/release-notes.md")
+        gh("release", "create", tag, "--verify-tag", "--draft", "--title", f"Gitler {tag[1:]}", "--notes-file", ".github/release-notes.md", *channel_flags(app_version))
     data = release(tag)
     if not data["isDraft"]:
         raise SystemExit("This version is already published; create a new version instead")
@@ -77,7 +85,7 @@ def publish(tag):
         checksums = Path(directory) / "SHA256SUMS.txt"
         checksums.write_text("".join(lines))
         gh("release", "upload", tag, str(checksums), "--clobber")
-    gh("release", "edit", tag, "--draft=false", "--latest")
+    gh("release", "edit", tag, "--draft=false", *channel_flags(app_version))
     print(release(tag)["url"])
 
 

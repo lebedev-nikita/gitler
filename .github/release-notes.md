@@ -1,11 +1,12 @@
 Gitler is a read-only desktop Git graph for repositories with many branches and working copies.
 
-- See the entire repository from any worktree, without switching branches.
-- Find unfinished work as amber **Uncommitted changes** nodes attached to branch HEADs.
-- Inspect staged, unstaged, and untracked files.
-- Select one node, right-click another, and choose **Diff with selected** to compare commits or current files.
-- Resolve any commit by hash, including commits outside the loaded history.
-- Open repositories from the GUI or with `gitler /path/to/repository`.
+This is the first release candidate for 0.2.0.
+
+## Changes
+
+- Hide T3 Code checkpoints from the commit graph and hash navigation. Checkpoints remain available to T3 Code for restoring files.
+- Keep checkpoint snapshots out of history limits while preserving every registered worktree, including detached HEADs.
+- Simplify launch instructions: run `gitler /path/to/repository` to open a repository in the existing window.
 
 ## Downloads
 

@@ -8,7 +8,7 @@ on:
       tag:
         description: Existing version tag to build
         required: true
-        default: v0.1.0
+        default: v0.2.0-rc.1
 
 permissions:
   contents: read
@@ -29,6 +29,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ inputs.tag || github.ref }}
+      - name: Test release publication
+        run: python3 -m unittest discover -s scripts -p 'test_release.py'
       - name: Verify version and create draft release
         id: release
         env:
