@@ -1,0 +1,496 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-10T09:36:56.539495+00:00",
+  "title": "Design System: Gitler",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Instrument Teal",
+        "tonalRamp": [
+          "oklch(15.00% 0.0898 181.73)",
+          "oklch(26.43% 0.0898 181.73)",
+          "oklch(37.86% 0.0898 181.73)",
+          "oklch(49.29% 0.0898 181.73)",
+          "oklch(60.71% 0.0898 181.73)",
+          "oklch(72.14% 0.0898 181.73)",
+          "oklch(83.57% 0.0898 181.73)",
+          "oklch(95.00% 0.0898 181.73)"
+        ]
+      },
+      "primary-foreground": {
+        "role": "primary",
+        "displayName": "Deep Teal Ink",
+        "tonalRamp": [
+          "oklch(15.00% 0.0317 185.38)",
+          "oklch(26.43% 0.0317 185.38)",
+          "oklch(37.86% 0.0317 185.38)",
+          "oklch(49.29% 0.0317 185.38)",
+          "oklch(60.71% 0.0317 185.38)",
+          "oklch(72.14% 0.0317 185.38)",
+          "oklch(83.57% 0.0317 185.38)",
+          "oklch(95.00% 0.0317 185.38)"
+        ]
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "Workspace Blue-gray",
+        "tonalRamp": [
+          "oklch(15.00% 0.0246 246.40)",
+          "oklch(26.43% 0.0246 246.40)",
+          "oklch(37.86% 0.0246 246.40)",
+          "oklch(49.29% 0.0246 246.40)",
+          "oklch(60.71% 0.0246 246.40)",
+          "oklch(72.14% 0.0246 246.40)",
+          "oklch(83.57% 0.0246 246.40)",
+          "oklch(95.00% 0.0246 246.40)"
+        ]
+      },
+      "foreground": {
+        "role": "neutral",
+        "displayName": "Off-white Content",
+        "tonalRamp": [
+          "oklch(15.00% 0.0128 244.26)",
+          "oklch(26.43% 0.0128 244.26)",
+          "oklch(37.86% 0.0128 244.26)",
+          "oklch(49.29% 0.0128 244.26)",
+          "oklch(60.71% 0.0128 244.26)",
+          "oklch(72.14% 0.0128 244.26)",
+          "oklch(83.57% 0.0128 244.26)",
+          "oklch(95.00% 0.0128 244.26)"
+        ]
+      },
+      "card": {
+        "role": "neutral",
+        "displayName": "Toolbar Blue-gray",
+        "tonalRamp": [
+          "oklch(15.00% 0.0285 246.86)",
+          "oklch(26.43% 0.0285 246.86)",
+          "oklch(37.86% 0.0285 246.86)",
+          "oklch(49.29% 0.0285 246.86)",
+          "oklch(60.71% 0.0285 246.86)",
+          "oklch(72.14% 0.0285 246.86)",
+          "oklch(83.57% 0.0285 246.86)",
+          "oklch(95.00% 0.0285 246.86)"
+        ]
+      },
+      "popover": {
+        "role": "neutral",
+        "displayName": "Popover Blue-gray",
+        "tonalRamp": [
+          "oklch(15.00% 0.0301 246.93)",
+          "oklch(26.43% 0.0301 246.93)",
+          "oklch(37.86% 0.0301 246.93)",
+          "oklch(49.29% 0.0301 246.93)",
+          "oklch(60.71% 0.0301 246.93)",
+          "oklch(72.14% 0.0301 246.93)",
+          "oklch(83.57% 0.0301 246.93)",
+          "oklch(95.00% 0.0301 246.93)"
+        ]
+      },
+      "secondary": {
+        "role": "neutral",
+        "displayName": "Header Blue-gray",
+        "tonalRamp": [
+          "oklch(15.00% 0.0308 245.16)",
+          "oklch(26.43% 0.0308 245.16)",
+          "oklch(37.86% 0.0308 245.16)",
+          "oklch(49.29% 0.0308 245.16)",
+          "oklch(60.71% 0.0308 245.16)",
+          "oklch(72.14% 0.0308 245.16)",
+          "oklch(83.57% 0.0308 245.16)",
+          "oklch(95.00% 0.0308 245.16)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Control Blue-gray",
+        "tonalRamp": [
+          "oklch(15.00% 0.0348 245.75)",
+          "oklch(26.43% 0.0348 245.75)",
+          "oklch(37.86% 0.0348 245.75)",
+          "oklch(49.29% 0.0348 245.75)",
+          "oklch(60.71% 0.0348 245.75)",
+          "oklch(72.14% 0.0348 245.75)",
+          "oklch(83.57% 0.0348 245.75)",
+          "oklch(95.00% 0.0348 245.75)"
+        ]
+      },
+      "muted-foreground": {
+        "role": "neutral",
+        "displayName": "Muted Metadata",
+        "tonalRamp": [
+          "oklch(15.00% 0.0299 246.58)",
+          "oklch(26.43% 0.0299 246.58)",
+          "oklch(37.86% 0.0299 246.58)",
+          "oklch(49.29% 0.0299 246.58)",
+          "oklch(60.71% 0.0299 246.58)",
+          "oklch(72.14% 0.0299 246.58)",
+          "oklch(83.57% 0.0299 246.58)",
+          "oklch(95.00% 0.0299 246.58)"
+        ]
+      },
+      "accent": {
+        "role": "neutral",
+        "displayName": "Focused Blue-gray",
+        "tonalRamp": [
+          "oklch(15.00% 0.0445 246.79)",
+          "oklch(26.43% 0.0445 246.79)",
+          "oklch(37.86% 0.0445 246.79)",
+          "oklch(49.29% 0.0445 246.79)",
+          "oklch(60.71% 0.0445 246.79)",
+          "oklch(72.14% 0.0445 246.79)",
+          "oklch(83.57% 0.0445 246.79)",
+          "oklch(95.00% 0.0445 246.79)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Hairline Blue-gray",
+        "tonalRamp": [
+          "oklch(15.00% 0.0331 247.06)",
+          "oklch(26.43% 0.0331 247.06)",
+          "oklch(37.86% 0.0331 247.06)",
+          "oklch(49.29% 0.0331 247.06)",
+          "oklch(60.71% 0.0331 247.06)",
+          "oklch(72.14% 0.0331 247.06)",
+          "oklch(83.57% 0.0331 247.06)",
+          "oklch(95.00% 0.0331 247.06)"
+        ]
+      },
+      "dirty": {
+        "role": "secondary",
+        "displayName": "Working Amber",
+        "tonalRamp": [
+          "oklch(15.00% 0.1141 76.39)",
+          "oklch(26.43% 0.1141 76.39)",
+          "oklch(37.86% 0.1141 76.39)",
+          "oklch(49.29% 0.1141 76.39)",
+          "oklch(60.71% 0.1141 76.39)",
+          "oklch(72.14% 0.1141 76.39)",
+          "oklch(83.57% 0.1141 76.39)",
+          "oklch(95.00% 0.1141 76.39)"
+        ]
+      },
+      "tag": {
+        "role": "tertiary",
+        "displayName": "Tag Lavender",
+        "tonalRamp": [
+          "oklch(15.00% 0.1070 300.04)",
+          "oklch(26.43% 0.1070 300.04)",
+          "oklch(37.86% 0.1070 300.04)",
+          "oklch(49.29% 0.1070 300.04)",
+          "oklch(60.71% 0.1070 300.04)",
+          "oklch(72.14% 0.1070 300.04)",
+          "oklch(83.57% 0.1070 300.04)",
+          "oklch(95.00% 0.1070 300.04)"
+        ]
+      },
+      "added": {
+        "role": "secondary",
+        "displayName": "Addition Mint",
+        "tonalRamp": [
+          "oklch(15.00% 0.0841 156.92)",
+          "oklch(26.43% 0.0841 156.92)",
+          "oklch(37.86% 0.0841 156.92)",
+          "oklch(49.29% 0.0841 156.92)",
+          "oklch(60.71% 0.0841 156.92)",
+          "oklch(72.14% 0.0841 156.92)",
+          "oklch(83.57% 0.0841 156.92)",
+          "oklch(95.00% 0.0841 156.92)"
+        ]
+      },
+      "removed": {
+        "role": "secondary",
+        "displayName": "Removal Rose",
+        "tonalRamp": [
+          "oklch(15.00% 0.0768 11.77)",
+          "oklch(26.43% 0.0768 11.77)",
+          "oklch(37.86% 0.0768 11.77)",
+          "oklch(49.29% 0.0768 11.77)",
+          "oklch(60.71% 0.0768 11.77)",
+          "oklch(72.14% 0.0768 11.77)",
+          "oklch(83.57% 0.0768 11.77)",
+          "oklch(95.00% 0.0768 11.77)"
+        ]
+      },
+      "destructive": {
+        "role": "secondary",
+        "displayName": "Error Rose",
+        "tonalRamp": [
+          "oklch(15.00% 0.0867 13.79)",
+          "oklch(26.43% 0.0867 13.79)",
+          "oklch(37.86% 0.0867 13.79)",
+          "oklch(49.29% 0.0867 13.79)",
+          "oklch(60.71% 0.0867 13.79)",
+          "oklch(72.14% 0.0867 13.79)",
+          "oklch(83.57% 0.0867 13.79)",
+          "oklch(95.00% 0.0867 13.79)"
+        ]
+      },
+      "lane-blue": {
+        "role": "tertiary",
+        "displayName": "Lane Blue",
+        "tonalRamp": [
+          "oklch(15.00% 0.1150 249.93)",
+          "oklch(26.43% 0.1150 249.93)",
+          "oklch(37.86% 0.1150 249.93)",
+          "oklch(49.29% 0.1150 249.93)",
+          "oklch(60.71% 0.1150 249.93)",
+          "oklch(72.14% 0.1150 249.93)",
+          "oklch(83.57% 0.1150 249.93)",
+          "oklch(95.00% 0.1150 249.93)"
+        ]
+      },
+      "lane-violet": {
+        "role": "tertiary",
+        "displayName": "Lane Violet",
+        "tonalRamp": [
+          "oklch(15.00% 0.1304 301.35)",
+          "oklch(26.43% 0.1304 301.35)",
+          "oklch(37.86% 0.1304 301.35)",
+          "oklch(49.29% 0.1304 301.35)",
+          "oklch(60.71% 0.1304 301.35)",
+          "oklch(72.14% 0.1304 301.35)",
+          "oklch(83.57% 0.1304 301.35)",
+          "oklch(95.00% 0.1304 301.35)"
+        ]
+      },
+      "lane-rose": {
+        "role": "tertiary",
+        "displayName": "Lane Rose",
+        "tonalRamp": [
+          "oklch(15.00% 0.0947 353.24)",
+          "oklch(26.43% 0.0947 353.24)",
+          "oklch(37.86% 0.0947 353.24)",
+          "oklch(49.29% 0.0947 353.24)",
+          "oklch(60.71% 0.0947 353.24)",
+          "oklch(72.14% 0.0947 353.24)",
+          "oklch(83.57% 0.0947 353.24)",
+          "oklch(95.00% 0.0947 353.24)"
+        ]
+      },
+      "lane-olive": {
+        "role": "tertiary",
+        "displayName": "Lane Olive",
+        "tonalRamp": [
+          "oklch(15.00% 0.0964 124.26)",
+          "oklch(26.43% 0.0964 124.26)",
+          "oklch(37.86% 0.0964 124.26)",
+          "oklch(49.29% 0.0964 124.26)",
+          "oklch(60.71% 0.0964 124.26)",
+          "oklch(72.14% 0.0964 124.26)",
+          "oklch(83.57% 0.0964 124.26)",
+          "oklch(95.00% 0.0964 124.26)"
+        ]
+      },
+      "lane-cyan": {
+        "role": "tertiary",
+        "displayName": "Lane Cyan",
+        "tonalRamp": [
+          "oklch(15.00% 0.0764 223.52)",
+          "oklch(26.43% 0.0764 223.52)",
+          "oklch(37.86% 0.0764 223.52)",
+          "oklch(49.29% 0.0764 223.52)",
+          "oklch(60.71% 0.0764 223.52)",
+          "oklch(72.14% 0.0764 223.52)",
+          "oklch(83.57% 0.0764 223.52)",
+          "oklch(95.00% 0.0764 223.52)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "title": {
+        "displayName": "Pane Title",
+        "purpose": "Graph and inspector headings."
+      },
+      "body": {
+        "displayName": "Working Text",
+        "purpose": "Commit subjects and regular interface copy."
+      },
+      "label": {
+        "displayName": "Metadata",
+        "purpose": "Authors, dates, file headings, and auxiliary labels."
+      },
+      "code": {
+        "displayName": "Patch Code",
+        "purpose": "Whitespace-preserving patch text with aligned line numbers."
+      }
+    },
+    "shadows": [
+      {
+        "name": "control-xs",
+        "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        "purpose": "Subtle outline-button and field depth."
+      },
+      {
+        "name": "menu-md",
+        "value": "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
+        "purpose": "Transient context-menu elevation."
+      },
+      {
+        "name": "focus-ring",
+        "value": "0 0 0 3px color-mix(in srgb, var(--primary), transparent 50%)",
+        "purpose": "Keyboard-focus visibility on shadcn controls."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state-duration",
+        "value": "150ms",
+        "purpose": "Default button and field transitions."
+      },
+      {
+        "name": "row-duration",
+        "value": "100ms",
+        "purpose": "History-row fill changes."
+      },
+      {
+        "name": "popup-duration",
+        "value": "100ms",
+        "purpose": "Context-menu and dialog fade/zoom transitions."
+      },
+      {
+        "name": "state-easing",
+        "value": "cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Default control-state easing."
+      },
+      {
+        "name": "loading-spin",
+        "value": "spin 1s linear infinite",
+        "purpose": "Busy repository-refresh and loading indicators."
+      },
+      {
+        "name": "reduced-motion-duration",
+        "value": "0.001ms",
+        "purpose": "Animation and transition override under prefers-reduced-motion: reduce."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact-desktop",
+        "value": "1150px"
+      },
+      {
+        "name": "stacked-inspector",
+        "value": "760px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "description": "The default action used to open a repository from its dialog.",
+      "html": "<button class=\"ds-button-primary\">Open</button>",
+      "css": ".ds-button-primary { display:inline-flex; align-items:center; justify-content:center; gap:3.25px; height:29.25px; padding:0 8.125px; border:1px solid transparent; border-radius:var(--radius-md, 5px); background:var(--primary, #69c3b4); color:var(--primary-foreground, #122b28); font-family:var(--font-sans, \"Inter Variable\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif); font-size:11.375px; font-weight:500; white-space:nowrap; cursor:pointer; transition:all 150ms cubic-bezier(0.4,0,0.2,1);  } .ds-button-primary:hover { background:color-mix(in srgb,var(--primary, #69c3b4),transparent 20%); } .ds-button-primary:focus-visible { outline:none; border-color:var(--primary, #69c3b4); box-shadow:0 0 0 3px color-mix(in srgb,var(--primary, #69c3b4),transparent 50%); } .ds-button-primary:active { transform:translateY(1px); } .ds-button-primary:disabled { opacity:.5; pointer-events:none; } @media(prefers-reduced-motion:reduce) { .ds-button-primary { transition-duration:.001ms; } }",
+      "refersTo": "button-primary"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "description": "The small bordered repository-opening control in the toolbar.",
+      "html": "<button class=\"ds-button-outline\"><svg viewBox=\"0 0 24 24\" width=\"13\" height=\"13\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M6 14 7.5 10a2 2 0 0 1 1.9-1.3H20a2 2 0 0 1 1.9 2.6l-2.2 6a2 2 0 0 1-1.9 1.3H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.7.9l.8 1.2a2 2 0 0 0 1.7.9H18a2 2 0 0 1 2 2v.7\"/></svg><span>Open repository</span></button>",
+      "css": ".ds-button-outline { display:inline-flex; align-items:center; justify-content:center; gap:3.25px; height:26px; padding:0 8.125px; border:1px solid var(--border, #334352); border-radius:var(--radius-md, 5px); background:var(--background, #18232d); color:var(--foreground, #e5edf4); font-family:var(--font-sans, \"Inter Variable\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif); font-size:11.375px; font-weight:500; white-space:nowrap; cursor:pointer; transition:all 150ms cubic-bezier(0.4,0,0.2,1); box-shadow:0 1px 2px 0 rgb(0 0 0 / .05); } .ds-button-outline:hover { background:var(--muted, #263746); } .ds-button-outline:focus-visible { outline:none; border-color:var(--primary, #69c3b4); box-shadow:0 0 0 3px color-mix(in srgb,var(--primary, #69c3b4),transparent 50%); } .ds-button-outline:active { transform:translateY(1px); } .ds-button-outline:disabled { opacity:.5; pointer-events:none; } @media(prefers-reduced-motion:reduce) { .ds-button-outline { transition-duration:.001ms; } }",
+      "refersTo": "button-outline"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "description": "Low-emphasis utility and disclosure actions.",
+      "html": "<button class=\"ds-button-ghost\" aria-expanded=\"false\">Filters</button>",
+      "css": ".ds-button-ghost { display:inline-flex; align-items:center; justify-content:center; gap:3.25px; height:26px; padding:0 8.125px; border:1px solid transparent; border-radius:var(--radius-md, 5px); background:transparent; color:var(--foreground, #e5edf4); font-family:var(--font-sans, \"Inter Variable\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif); font-size:11.375px; font-weight:500; white-space:nowrap; cursor:pointer; transition:all 150ms cubic-bezier(0.4,0,0.2,1);  } .ds-button-ghost:hover { background:var(--muted, #263746); } .ds-button-ghost:focus-visible { outline:none; border-color:var(--primary, #69c3b4); box-shadow:0 0 0 3px color-mix(in srgb,var(--primary, #69c3b4),transparent 50%); } .ds-button-ghost:active { transform:translateY(1px); } .ds-button-ghost:disabled { opacity:.5; pointer-events:none; } @media(prefers-reduced-motion:reduce) { .ds-button-ghost { transition-duration:.001ms; } }",
+      "refersTo": "button-ghost"
+    },
+    {
+      "name": "Link Button",
+      "kind": "button",
+      "description": "Compact parent-commit links in optional metadata.",
+      "html": "<button class=\"ds-button-link\">0000001</button>",
+      "css": ".ds-button-link { display:inline-flex; align-items:center; justify-content:center; gap:3.25px; height:19.5px; padding:0 6.5px; border:1px solid transparent; border-radius:var(--radius-md, 5px); background:transparent; color:var(--primary, #69c3b4); font-family:var(--font-sans, \"Inter Variable\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif); font-size:11.375px; font-weight:500; white-space:nowrap; cursor:pointer; transition:all 150ms cubic-bezier(0.4,0,0.2,1);  } .ds-button-link:hover { background:transparent; } .ds-button-link:focus-visible { outline:none; border-color:var(--primary, #69c3b4); box-shadow:0 0 0 3px color-mix(in srgb,var(--primary, #69c3b4),transparent 50%); } .ds-button-link:active { transform:translateY(1px); } .ds-button-link:disabled { opacity:.5; pointer-events:none; } @media(prefers-reduced-motion:reduce) { .ds-button-link { transition-duration:.001ms; } } .ds-button-link:hover { text-decoration:underline; text-underline-offset:4px; }",
+      "refersTo": "button-link"
+    },
+    {
+      "name": "History Search",
+      "kind": "input",
+      "description": "A bordered input group for history search and commit-hash resolution.",
+      "html": "<div class=\"ds-search\"><svg viewBox=\"0 0 24 24\" width=\"13\" height=\"13\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg><input class=\"ds-search-input\" aria-label=\"Search history\" placeholder=\"Search commits, branches, authors…\" /></div>",
+      "css": ".ds-search { display:flex; align-items:center; gap:6.5px; width:100%; max-width:560px; height:29.25px; color:var(--muted-foreground, #a0b1c1); border:1px solid var(--border, #334352); border-radius:var(--radius-md,5px); box-shadow:0 1px 2px 0 rgb(0 0 0 / .05); padding:0 8.125px; transition:color 150ms,box-shadow 150ms; } .ds-search-input { flex:1; min-width:0; height:100%; padding:0; border:0; outline:none; background:transparent; color:var(--foreground, #e5edf4); caret-color:var(--primary, #69c3b4); font:11.375px var(--font-sans, \"Inter Variable\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif); } .ds-search-input::placeholder { color:var(--muted-foreground, #a0b1c1); } .ds-search:has(.ds-search-input:focus-visible) { border-color:var(--primary, #69c3b4); box-shadow:0 0 0 3px color-mix(in srgb,var(--primary, #69c3b4),transparent 50%); } @media(prefers-reduced-motion:reduce) { .ds-search { transition-duration:.001ms; } }",
+      "refersTo": "search-field"
+    },
+    {
+      "name": "Reference Badges",
+      "kind": "chip",
+      "description": "Compact branch, working-copy, tag, and remote identities used beside graph subjects.",
+      "html": "<div class=\"ds-badges\"><span class=\"ds-badge ds-badge-branch\">main</span><span class=\"ds-badge ds-badge-dirty\">agent/auth-flow</span><span class=\"ds-badge ds-badge-tag\">v0.1.0</span><span class=\"ds-badge ds-badge-remote\">origin/main</span></div>",
+      "css": ".ds-badges { display:flex; flex-wrap:wrap; gap:5px; } .ds-badge { display:inline-flex; align-items:center; height:18px; padding:0 5px; border:1px solid transparent; border-radius:4px; font-family:var(--font-sans, \"Inter Variable\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif); font-size:10px; font-weight:500; white-space:nowrap; } .ds-badge-branch { color:#75b5f6; background:color-mix(in srgb,#75b5f6,transparent 92%); border-color:color-mix(in srgb,#75b5f6,transparent 65%); } .ds-badge-dirty { color:var(--dirty, #e9b566); background:color-mix(in srgb,var(--dirty, #e9b566),transparent 90%); border-color:color-mix(in srgb,var(--dirty, #e9b566),transparent 75%); } .ds-badge-tag { color:var(--tag,#bfa5ef); background:color-mix(in srgb,var(--tag,#bfa5ef),transparent 90%); border-color:color-mix(in srgb,var(--tag,#bfa5ef),transparent 75%); } .ds-badge-remote { color:var(--foreground, #e5edf4); border-color:var(--border, #334352); }",
+      "refersTo": "badge-branch"
+    },
+    {
+      "name": "Repository Toolbar",
+      "kind": "nav",
+      "description": "The persistent flat instrument header, with compact repository navigation and opening action.",
+      "html": "<nav class=\"ds-toolbar\" aria-label=\"Repository toolbar\"><span class=\"ds-mark\"><svg viewBox=\"0 0 24 24\" width=\"23\" height=\"23\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"18\" r=\"3\"/><circle cx=\"6\" cy=\"6\" r=\"3\"/><circle cx=\"18\" cy=\"6\" r=\"3\"/><path d=\"M18 9a6 6 0 0 1-6 6M6 9a6 6 0 0 0 6 6\"/></svg></span><strong class=\"ds-name\">Gitler</strong><span class=\"ds-divider\"></span><button class=\"ds-repository\">gitler</button><span class=\"ds-toolbar-spacer\"></span><button class=\"ds-open\"><svg viewBox=\"0 0 24 24\" width=\"13\" height=\"13\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M6 14 7.5 10a2 2 0 0 1 1.9-1.3H20a2 2 0 0 1 1.9 2.6l-2.2 6a2 2 0 0 1-1.9 1.3H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.7.9l.8 1.2a2 2 0 0 0 1.7.9H18a2 2 0 0 1 2 2v.7\"/></svg><span>Open repository</span></button></nav>",
+      "css": ".ds-toolbar { display:flex; align-items:center; gap:10px; height:54px; padding:0 18px; border-bottom:1px solid var(--border, #334352); background:var(--card,#1d2a36); color:var(--foreground, #e5edf4); font-family:var(--font-sans, \"Inter Variable\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif); } .ds-mark { display:grid; place-items:center; flex:none; width:28px; height:28px; color:var(--primary, #69c3b4); } .ds-name { font-size:16px; font-weight:650; letter-spacing:-.025em; } .ds-divider { height:17px; width:1px; margin:0 3px; background:var(--border, #334352); } .ds-toolbar-spacer { flex:1; }.ds-repository { display:inline-flex; align-items:center; justify-content:center; gap:3.25px; height:26px; padding:0 8.125px; border:1px solid transparent; border-radius:var(--radius-md, 5px); background:transparent; color:var(--foreground, #e5edf4); font-family:var(--font-sans, \"Inter Variable\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif); font-size:11.375px; font-weight:500; white-space:nowrap; cursor:pointer; transition:all 150ms cubic-bezier(0.4,0,0.2,1);  } .ds-repository:hover { background:var(--muted, #263746); } .ds-repository:focus-visible { outline:none; border-color:var(--primary, #69c3b4); box-shadow:0 0 0 3px color-mix(in srgb,var(--primary, #69c3b4),transparent 50%); } .ds-repository:active { transform:translateY(1px); } .ds-repository:disabled { opacity:.5; pointer-events:none; } @media(prefers-reduced-motion:reduce) { .ds-repository { transition-duration:.001ms; } }.ds-open { display:inline-flex; align-items:center; justify-content:center; gap:3.25px; height:26px; padding:0 8.125px; border:1px solid var(--border, #334352); border-radius:var(--radius-md, 5px); background:var(--background, #18232d); color:var(--foreground, #e5edf4); font-family:var(--font-sans, \"Inter Variable\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif); font-size:11.375px; font-weight:500; white-space:nowrap; cursor:pointer; transition:all 150ms cubic-bezier(0.4,0,0.2,1); box-shadow:0 1px 2px 0 rgb(0 0 0 / .05); } .ds-open:hover { background:var(--muted, #263746); } .ds-open:focus-visible { outline:none; border-color:var(--primary, #69c3b4); box-shadow:0 0 0 3px color-mix(in srgb,var(--primary, #69c3b4),transparent 50%); } .ds-open:active { transform:translateY(1px); } .ds-open:disabled { opacity:.5; pointer-events:none; } @media(prefers-reduced-motion:reduce) { .ds-open { transition-duration:.001ms; } } @media(max-width:760px) { .ds-toolbar { padding:0 10px; gap:5px; } }"
+    },
+    {
+      "name": "History Nodes",
+      "kind": "custom",
+      "description": "Compact graph rows with solid committed nodes and amber working-copy ring nodes.",
+      "html": "<div class=\"ds-history\"><button class=\"ds-row ds-working\" aria-pressed=\"false\"><svg class=\"ds-vertex\" width=\"76\" height=\"42\" aria-hidden=\"true\"><path d=\"M20 21L20 42\" stroke=\"#e9b566\" stroke-width=\"1.7\" stroke-dasharray=\"3 3\"/><circle cx=\"20\" cy=\"21\" r=\"5.4\" fill=\"#18232d\" stroke=\"#e9b566\" stroke-width=\"2.5\"/><circle cx=\"20\" cy=\"21\" r=\"2.3\" fill=\"#e9b566\"/></svg><span class=\"ds-row-message\"><span class=\"ds-subject\">Uncommitted changes</span><span class=\"ds-row-refs\"><span class=\"ds-row-badge ds-dirty-ref\">agent/auth-flow</span><span class=\"ds-dirty-count\">3 files</span></span></span><span class=\"ds-date\">Uncommitted</span></button><button class=\"ds-row\" aria-pressed=\"true\"><svg class=\"ds-vertex\" width=\"76\" height=\"42\" aria-hidden=\"true\"><path d=\"M20 0L20 42\" stroke=\"#75b5f6\" stroke-width=\"1.7\"/><circle cx=\"20\" cy=\"21\" r=\"4.4\" fill=\"#75b5f6\" stroke=\"#75b5f6\" stroke-width=\"1.5\"/></svg><span class=\"ds-row-message\"><span class=\"ds-subject\">Add repository-wide worktree discovery</span><span class=\"ds-row-refs\"><span class=\"ds-row-badge ds-lane-ref\">main</span></span></span><span class=\"ds-date\">Oct 10</span></button></div>",
+      "css": ".ds-history { width:100%; background:var(--background, #18232d); color:var(--foreground, #e5edf4); font-family:var(--font-sans, \"Inter Variable\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif); } .ds-row { display:grid; grid-template-columns:76px minmax(0,1fr) 65px; align-items:center; width:100%; height:42px; padding:0; border:0; border-bottom:1px solid color-mix(in srgb,var(--border, #334352),transparent 55%); background:transparent; color:inherit; text-align:left; cursor:pointer; transition:background-color 100ms; } .ds-row:hover { background:#213342; } .ds-row[aria-pressed=true] { background:#294158; } .ds-row:focus-visible { outline:2px solid var(--primary, #69c3b4); outline-offset:-2px; } .ds-row-message { display:flex; flex-direction:column; align-items:flex-start; gap:2px; min-width:0; padding-right:8px; } .ds-subject { width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; } .ds-row-refs { display:flex; align-items:center; gap:5px; } .ds-row-badge { display:inline-flex; align-items:center; height:18px; padding:0 5px; border:1px solid transparent; border-radius:4px; font-size:10px; font-weight:500; } .ds-dirty-ref { color:var(--dirty, #e9b566); background:color-mix(in srgb,var(--dirty, #e9b566),transparent 90%); border-color:color-mix(in srgb,var(--dirty, #e9b566),transparent 75%); } .ds-lane-ref { color:#75b5f6; background:color-mix(in srgb,#75b5f6,transparent 92%); border-color:color-mix(in srgb,#75b5f6,transparent 65%); } .ds-working { background:color-mix(in srgb,var(--dirty, #e9b566),transparent 96%); } .ds-working .ds-subject { color:var(--dirty, #e9b566); font-weight:500; } .ds-working:hover { background:color-mix(in srgb,var(--dirty, #e9b566),transparent 91%); } .ds-working[aria-pressed=true] { background:color-mix(in srgb,var(--dirty, #e9b566),transparent 88%); } .ds-dirty-count { color:var(--dirty, #e9b566); font-size:10px; white-space:nowrap; } .ds-date { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted-foreground, #a0b1c1); font-family:var(--font-sans, \"Inter Variable\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif); font-size:11px; font-variant-numeric:tabular-nums; } @media(prefers-reduced-motion:reduce) { .ds-row { transition-duration:.001ms; } }",
+      "refersTo": "graph-row"
+    },
+    {
+      "name": "Working Changes Modes",
+      "kind": "nav",
+      "description": "The joined all/staged/unstaged mode selector inside the inspector.",
+      "html": "<div class=\"ds-modes\" role=\"group\" aria-label=\"Working changes view\"><button class=\"ds-mode\" aria-pressed=\"true\">All changes</button><button class=\"ds-mode\" aria-pressed=\"false\">Staged</button><button class=\"ds-mode\" aria-pressed=\"false\">Unstaged</button></div>",
+      "css": ".ds-modes { display:flex; width:100%; background:transparent; } .ds-mode { flex:1; height:26px; padding:0 6.5px; border:0; border-radius:0; background:transparent; color:var(--foreground, #e5edf4); font-family:var(--font-sans, \"Inter Variable\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif); font-size:11px; font-weight:500; cursor:pointer; transition:color 150ms,box-shadow 150ms; } .ds-mode:first-child { border-radius:5px 0 0 5px; } .ds-mode:last-child { border-radius:0 5px 5px 0; } .ds-mode[aria-pressed=true],.ds-mode:hover { background:var(--muted, #263746); } .ds-mode:focus-visible { position:relative; z-index:1; outline:none; box-shadow:0 0 0 3px color-mix(in srgb,var(--primary, #69c3b4),transparent 50%); } @media(prefers-reduced-motion:reduce) { .ds-mode { transition-duration:.001ms; } }"
+    },
+    {
+      "name": "Patch",
+      "kind": "custom",
+      "description": "The neutral file header and sign-and-line-number patch rows, preserving horizontal code scrolling.",
+      "html": "<section class=\"ds-patch\" aria-label=\"Patch preview\"><div class=\"ds-patch-header\"><span>src/auth/session.ts</span><span class=\"ds-patch-stats\"><span class=\"ds-added\">+1</span><span class=\"ds-removed\">−1</span></span></div><div class=\"ds-patch-scroll\" tabindex=\"0\"><div class=\"ds-patch-lines\"><div class=\"ds-diff-line ds-hunk\"><span class=\"ds-line-number\"></span><span class=\"ds-line-number\"></span><code>@@ -42,1 +42,1 @@</code></div><div class=\"ds-diff-line ds-deletion\"><span class=\"ds-line-number\">42</span><span class=\"ds-line-number\"></span><code>- const session = previous;</code></div><div class=\"ds-diff-line ds-addition\"><span class=\"ds-line-number\"></span><span class=\"ds-line-number\">42</span><code>+ const session = current;</code></div></div></div></section>",
+      "css": ".ds-patch { border-top:1px solid var(--border, #334352); background:#17232d; color:var(--foreground, #e5edf4); } .ds-patch-header { display:flex; align-items:center; gap:8px; height:39px; padding:0 15px; background:var(--secondary,#243340); font-family:var(--font-mono, \"SFMono-Regular\", Consolas, \"Liberation Mono\", monospace); font-size:10px; } .ds-patch-header > span:first-child { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .ds-patch-stats { display:flex; gap:8px; } .ds-added { color:var(--added,#a0dfb8); } .ds-removed { color:var(--removed,#edacb3); } .ds-patch-scroll { overflow:auto; scrollbar-gutter:stable; } .ds-patch-scroll:focus-visible { outline:2px solid var(--primary, #69c3b4); outline-offset:-2px; } .ds-patch-lines { min-width:100%; width:max-content; padding:10px 0 20px; font-family:var(--font-mono, \"SFMono-Regular\", Consolas, \"Liberation Mono\", monospace); font-size:10.5px; line-height:22px; } .ds-diff-line { display:flex; min-height:22px; min-width:100%; } .ds-line-number { flex:none; width:30px; padding-right:7px; color:#9aadbd; text-align:right; font-variant-numeric:tabular-nums; user-select:none; } .ds-diff-line code { padding:0 14px 0 7px; font-family:var(--font-mono, \"SFMono-Regular\", Consolas, \"Liberation Mono\", monospace); white-space:pre; } .ds-addition { background:#223c33; color:#c1ebd1; } .ds-deletion { background:#402e35; color:#f1c2c7; } .ds-hunk { margin-top:7px; background:#23384a; color:#a5c5e6; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Circuit Schematic Workspace",
+    "overview": "Blue-gray instrument panels make a dense repository readable without competing with its graph. Off-white subjects, subdued metadata, fine separators, and small geometric nodes create a quiet engineering surface. Color communicates identity or state; generous marketing treatments do not define the working interface.",
+    "keyCharacteristics": [
+      "Compact rows with stable alignment and restrained controls.",
+      "Teal actions, colored history lanes, and amber uncommitted work.",
+      "Monospace technical evidence inside flat, independently scrolling panes."
+    ],
+    "rules": [
+      {
+        "name": "The State Color Rule",
+        "body": "Amber marks uncommitted work; branch identity colors follow their graph lanes. Do not reuse amber as arbitrary decoration.",
+        "section": "colors"
+      },
+      {
+        "name": "The Technical Text Rule",
+        "body": "Use monospace for paths, hashes, shortcuts, and patch text; keep controls and prose in Inter.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Workspace Rule",
+        "body": "Persistent panes rely on tonal layering and hairline borders; reserve shadows for compact controls and transient context menus.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** keep labels short and in English.",
+      "**Do** pair semantic color with text, node shape, or diff signs.",
+      "**Do** keep technical metadata subdued and primary subjects readable.",
+      "**Do** preserve row alignment and patch space as the viewport narrows."
+    ],
+    "donts": [
+      "**Don't** use amber for decoration unrelated to uncommitted work.",
+      "**Don't** introduce large display typography into dense inspection panes.",
+      "**Don't** add elevated card treatments to the flat working workspace."
+    ]
+  }
+}

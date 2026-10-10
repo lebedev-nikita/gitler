@@ -1,0 +1,12 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/schemas/
+.DS_Store
+playwright-report/
+test-results/
+.impeccable/review/
+.impeccable/mocks/
+.impeccable/build/
+__pycache__/
+*.pyc

@@ -1,0 +1,107 @@
+import { useState } from "react";
+import { Check, Copy, AlertTriangle, LoaderCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import type { LucideIcon } from "lucide-react";
+
+export function CopyButton({ value, label = "Copy" }: { value: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  const [failed, setFailed] = useState(false);
+  return (
+    <Button
+      size="icon-xs"
+      variant="ghost"
+      aria-label={copied ? "Copied" : label}
+      title={failed ? "Clipboard unavailable" : copied ? "Copied" : label}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setCopied(true);
+          setFailed(false);
+          setTimeout(() => setCopied(false), 1800);
+        } catch {
+          setFailed(true);
+        }
+      }}
+    >
+      {copied ? <Check /> : <Copy />}
+    </Button>
+  );
+}
+
+export function ErrorMessage({
+  title,
+  error,
+  retry,
+}: {
+  title: string;
+  error: unknown;
+  retry?: () => void;
+}) {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    <Alert variant="destructive">
+      <AlertTriangle />
+      <AlertTitle>{title}</AlertTitle>
+      <AlertDescription>
+        <p>{message}</p>
+        {retry && (
+          <Button variant="outline" size="sm" onClick={retry}>
+            Try again
+          </Button>
+        )}
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+export function EmptyMessage({
+  icon: Icon,
+  title,
+  description,
+  children,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <Empty>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <Icon />
+        </EmptyMedia>
+        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyDescription>{description}</EmptyDescription>
+      </EmptyHeader>
+      {children}
+    </Empty>
+  );
+}
+
+export function Loading({ text = "Loading…" }: { text?: string }) {
+  return (
+    <div className="loading-state" role="status">
+      <LoaderCircle className="spin" />
+      {text}
+    </div>
+  );
+}
+
+export const shortHash = (hash: string) => hash.slice(0, 7);
+export const shortPath = (path: string) =>
+  path.replace(/^\/Users\/[^/]+\//, "~/").replace(/^\/home\/[^/]+\//, "~/");
+export const dateLabel = (timestamp: number) =>
+  new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(timestamp * 1000);
+export const fullDate = (timestamp: number) =>
+  new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(
+    timestamp * 1000,
+  );
