@@ -4,7 +4,6 @@ test("repository graph, working nodes, context-menu comparisons and filters", as
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
-  await expect(page.getByText("3 branches have uncommitted changes")).toBeVisible();
   await expect(page.getByRole("button", { name: /^Uncommitted changes on/ })).toHaveCount(3);
   await expect(page.getByLabel("Selection details")).toContainText("agent/auth-flow");
   await expect(page.getByLabel("Diff for src/auth/session.ts")).toBeVisible();

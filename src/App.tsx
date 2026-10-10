@@ -3,9 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
-  AlertTriangle,
   Archive,
-  Check,
   ChevronRight,
   Database,
   FolderOpen,
@@ -47,6 +45,7 @@ import { selectionId } from "@/lib/models";
 import type { Commit, Comparison, GraphAction, Selection } from "@/lib/models";
 import { cn } from "@/lib/utils";
 import { mergeCommitHistory } from "@/lib/graph";
+import appIcon from "../assets/icons/favicon.png";
 
 const initialInspectorView: InspectorView = { filePath: null, mode: "combined", metadata: false };
 
@@ -151,9 +150,6 @@ export default function App() {
     }
   }, [path, repository.data, repository.refetch, remoteSync.refetch]);
   const demo = !!snapshot && isDemo(snapshot.commonDir);
-  const dirty = snapshot?.worktrees.filter((tree) => tree.files.length > 0 && !tree.error) ?? [];
-  const unavailable = snapshot?.worktrees.filter((tree) => tree.error) ?? [];
-  const branchesWithChanges = new Set(dirty.map((tree) => tree.branch ?? tree.path)).size;
 
   const select = useCallback((selection: Selection) => {
     setSelected(selection);
@@ -304,9 +300,7 @@ export default function App() {
   return (
     <main className="h-dvh flex flex-col overflow-hidden">
       <header className="flex-none flex items-center gap-[10px] h-[54px] py-0 px-[18px] bg-card border-b border-border compact:py-0 compact:px-[10px] compact:gap-[5px]">
-        <div className="grid place-items-center size-[28px] text-primary">
-          <GitFork className="size-[23px] [stroke-width:1.7]" />
-        </div>
+        <img src={appIcon} alt="" width={28} height={28} className="size-[28px] flex-none" />
         <strong className="text-[16px] font-[650] tracking-[-0.025em]">Gitler</strong>
         <span className="h-[17px] w-[1px] my-0 mx-[3px] bg-border" />
         <Button
@@ -438,44 +432,6 @@ export default function App() {
         </div>
       ) : (
         <>
-          <div className="flex items-center justify-between gap-[14px] min-h-[44px] py-[10px] px-[24px] border-b border-border text-muted-foreground text-[12px] compact:py-[10px] compact:px-[14px]">
-            <div className="flex gap-[10px] items-center min-w-0">
-              {dirty.length > 0 ? (
-                <>
-                  <span className="inline-block size-[7px] flex-none rounded-full bg-dirty" />
-                  <strong className="text-foreground font-medium compact:text-[11px]">
-                    {branchesWithChanges}{" "}
-                    {branchesWithChanges === 1 ? "branch has" : "branches have"} uncommitted changes
-                  </strong>
-                  <span className="compact:hidden">
-                    {dirty.reduce((sum, tree) => sum + tree.files.length, 0)} files across working
-                    copies
-                  </span>
-                </>
-              ) : (
-                <>
-                  <Check className="size-[15px] text-primary" />
-                  <strong className="text-foreground font-medium compact:text-[11px]">
-                    All working copies are clean
-                  </strong>
-                </>
-              )}
-              {unavailable.length > 0 && (
-                <button
-                  className="inline-flex gap-[4px] items-center text-destructive"
-                  onClick={() => showInfo()}
-                >
-                  <AlertTriangle className="size-[15px] text-inherit" />
-                  {unavailable.length} unavailable
-                </button>
-              )}
-            </div>
-            <span className="compact:hidden">
-              {snapshot.refs.filter((ref) => ref.kind === "branch").length} branches
-              <span className="py-0 px-[9px]">·</span>
-              {demo ? "Illustrative data" : "Entire repository"}
-            </span>
-          </div>
           <ResizableSplit
             id={narrow ? "workspace-stacked" : "workspace-horizontal"}
             orientation={narrow ? "vertical" : "horizontal"}
