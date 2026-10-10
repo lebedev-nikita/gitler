@@ -233,7 +233,9 @@ pub fn resolve_common(path: &str) -> Result<PathBuf, String> {
         directory,
         &["rev-parse", "--path-format=absolute", "--git-common-dir"],
     )?;
-    std::fs::canonicalize(string(&result).trim()).map_err(|error| error.to_string())
+    // Git for Windows rejects Rust's verbatim \\?\ path prefix. Dunce retains
+    // canonical identity while returning a conventional path where possible.
+    dunce::canonicalize(string(&result).trim()).map_err(|error| error.to_string())
 }
 
 fn validate_common(path: &str) -> Result<PathBuf, String> {
@@ -703,8 +705,8 @@ fn read_working_file(root: &Path, path: &str) -> Result<Vec<u8>, String> {
             .as_bytes()
             .to_vec());
     }
-    let canonical = std::fs::canonicalize(&path).map_err(|error| error.to_string())?;
-    let canonical_root = std::fs::canonicalize(root).map_err(|error| error.to_string())?;
+    let canonical = dunce::canonicalize(&path).map_err(|error| error.to_string())?;
+    let canonical_root = dunce::canonicalize(root).map_err(|error| error.to_string())?;
     if !canonical.starts_with(canonical_root) {
         return Err("File resolves outside this worktree".into());
     }
@@ -914,9 +916,9 @@ pub fn file_diff(request: &DiffRequest) -> Result<DiffResult, String> {
                     truncated: false,
                 });
             }
-            let canonical = std::fs::canonicalize(&path).map_err(|error| error.to_string())?;
+            let canonical = dunce::canonicalize(&path).map_err(|error| error.to_string())?;
             let canonical_root =
-                std::fs::canonicalize(tree_path).map_err(|error| error.to_string())?;
+                dunce::canonicalize(tree_path).map_err(|error| error.to_string())?;
             if !canonical.starts_with(&canonical_root) {
                 return Err("File resolves outside this worktree".into());
             }

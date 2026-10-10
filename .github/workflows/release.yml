@@ -100,10 +100,10 @@ jobs:
           key: ${{ matrix.target }}
       - name: Install frontend dependencies
         run: bun install --frozen-lockfile
-      - name: Check frontend and test graph behavior
-        run: |
-          bun run check
-          bun run test
+      - name: Check frontend
+        run: bun run check
+      - name: Test graph behavior
+        run: bun run test
       - name: Test native Git inspection
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml --target ${{ matrix.target }}
       - name: Build and attach platform installers
