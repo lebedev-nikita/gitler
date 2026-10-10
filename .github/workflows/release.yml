@@ -137,10 +137,12 @@ jobs:
         id: native-cache
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
-          key: native-release-v1-${{ runner.os }}-${{ matrix.target }}-1.99.0-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}
-          restore-keys: native-release-v1-${{ runner.os }}-${{ matrix.target }}-1.99.0-
+          key: native-release-${{ runner.os == 'Windows' && 'v2' || 'v1' }}-${{ runner.os }}-${{ matrix.target }}-1.99.0-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}
+          restore-keys: native-release-${{ runner.os == 'Windows' && 'v2' || 'v1' }}-${{ runner.os }}-${{ matrix.target }}-1.99.0-
           path: |
-            ~/.cargo/registry
+            ${{ runner.os == 'Windows' && '~/.cargo/registry/cache' || '~/.cargo/registry' }}
+            ${{ runner.os == 'Windows' && '~/.cargo/registry/index' || '' }}
+            ${{ runner.os == 'Windows' && '~/.cargo/registry/src/*/*-sys-*' || '' }}
             ~/.cargo/git
             src-tauri/target/release
             src-tauri/target/${{ matrix.target }}/release/build
@@ -186,7 +188,9 @@ jobs:
         with:
           key: ${{ steps.native-cache.outputs.cache-primary-key }}
           path: |
-            ~/.cargo/registry
+            ${{ runner.os == 'Windows' && '~/.cargo/registry/cache' || '~/.cargo/registry' }}
+            ${{ runner.os == 'Windows' && '~/.cargo/registry/index' || '' }}
+            ${{ runner.os == 'Windows' && '~/.cargo/registry/src/*/*-sys-*' || '' }}
             ~/.cargo/git
             src-tauri/target/release
             src-tauri/target/${{ matrix.target }}/release/build
