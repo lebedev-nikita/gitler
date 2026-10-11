@@ -3,6 +3,7 @@ import { demoSnapshot, oid } from "./demo";
 import {
   ancestorIds,
   DIRTY_COLOR,
+  LANE_COLORS,
   layoutGraph,
   mainlineIds,
   mergeCommitHistory,
@@ -118,6 +119,74 @@ describe("repository graph", () => {
       }
     },
   );
+
+  it("keeps a merged side line's color until it reaches its mainline ancestor", () => {
+    const nodes = [
+      { id: "merge", subject: "merge", parents: ["main-a", "side"] },
+      { id: "side", subject: "side", parents: ["root"] },
+      { id: "main-a", subject: "main-a", parents: ["main-b"] },
+      { id: "main-b", subject: "main-b", parents: ["root"] },
+      { id: "root", subject: "root", parents: [] },
+    ];
+    const mainline = new Set(["merge", "main-a", "main-b", "root"]);
+    const graph = layoutGraph(nodes, mainline);
+    const side = graph.rows[1];
+    expect(side.color).not.toBe(LANE_COLORS[0]);
+    expect(
+      side.segments
+        .filter((segment) => segment.from === side.lane)
+        .every((segment) => segment.color === side.color),
+    ).toBe(true);
+    for (const row of graph.rows.slice(2, 4)) {
+      expect(row.color).toBe(LANE_COLORS[0]);
+      expect(row.segments).toContainEqual({
+        from: side.lane,
+        to: side.lane,
+        half: "top",
+        color: side.color,
+      });
+      expect(row.segments).toContainEqual({
+        from: side.lane,
+        to: side.lane,
+        half: "bottom",
+        color: side.color,
+      });
+      expect(row.segments).toContainEqual(
+        expect.objectContaining({
+          from: 0,
+          half: "bottom",
+          color: LANE_COLORS[0],
+        }),
+      );
+    }
+    expect(graph.rows[4].color).toBe(LANE_COLORS[0]);
+    expect(graph.rows[4].segments).toContainEqual({
+      from: side.lane,
+      to: 0,
+      half: "top",
+      color: side.color,
+    });
+  });
+
+  it("keeps the source color when a side line joins an already pending mainline parent", () => {
+    const nodes = [
+      { id: "merge", subject: "merge", parents: ["main", "side"] },
+      { id: "main", subject: "main", parents: ["root"] },
+      { id: "side", subject: "side", parents: ["root"] },
+      { id: "root", subject: "root", parents: [] },
+    ];
+    const graph = layoutGraph(nodes, new Set(["merge", "main", "root"]));
+    const side = graph.rows[2];
+    expect(side.color).not.toBe(LANE_COLORS[0]);
+    expect(side.segments).toContainEqual({
+      from: side.lane,
+      to: 0,
+      half: "bottom",
+      color: side.color,
+      dashed: false,
+    });
+    expect(graph.rows[3].color).toBe(LANE_COLORS[0]);
+  });
 
   it("pins mainline working changes and keeps the lane when the tip is filtered out", () => {
     const demo = demoSnapshot();

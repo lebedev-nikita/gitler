@@ -186,20 +186,15 @@ export function layoutGraph(
               ? lane
               : freeLane();
         lanes[destination] = parent;
-        colors.set(
-          parent,
-          mainline.has(parent)
-            ? LANE_COLORS[0]
-            : index === 0
-              ? color
-              : LANE_COLORS[colorIndex++ % LANE_COLORS.length],
-        );
+        // Keep the incoming line's color until the actual join, even when its
+        // destination is a mainline commit. The commit itself stays coral.
+        colors.set(parent, index === 0 ? color : LANE_COLORS[colorIndex++ % LANE_COLORS.length]);
       }
       segments.push({
         from: lane,
         to: destination,
         half: "bottom",
-        color: colors.get(parent) ?? color,
+        color: index === 0 ? color : (colors.get(parent) ?? color),
         dashed: !availableIds.has(parent) || !!node.worktree,
       });
     });
