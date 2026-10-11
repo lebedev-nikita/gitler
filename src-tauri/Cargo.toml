@@ -1,6 +1,6 @@
 [package]
 name = "gitler"
-version = "0.4.5-rc.1"
+version = "0.5.0"
 description = "A repository-wide Git graph and worktree inspector"
 license-file = "../LICENSE"
 authors = ["Gitler contributors"]
@@ -34,6 +34,10 @@ tempfile = "3"
 sha2 = "0.10"
 libc = "0.2"
 base64 = "0.22"
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "json"] }
+tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
 [dev-dependencies]
 tauri = { version = "2", features = ["test"] }

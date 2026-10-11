@@ -3,6 +3,7 @@ pub mod browser;
 mod codex;
 pub mod git;
 mod launcher;
+mod threads;
 mod windows;
 
 use std::path::{Path, PathBuf};
@@ -100,6 +101,42 @@ async fn open_remote(common_dir: String, name: String) -> Result<(), String> {
     })
     .await
     .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn prepare_t3_thread(
+    common_dir: String,
+    branch: String,
+) -> Result<threads::Preparation, String> {
+    tauri::async_runtime::spawn_blocking(move || threads::prepare(&common_dir, &branch))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn start_t3_thread(
+    common_dir: String,
+    branch: String,
+    expected_head: String,
+    expected_worktree: Option<String>,
+) -> Result<threads::Launch, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        threads::start(
+            &common_dir,
+            &branch,
+            &expected_head,
+            expected_worktree.as_deref(),
+        )
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn open_t3_instructions() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(threads::open_instructions)
+        .await
+        .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -296,6 +333,9 @@ pub fn run() {
             repository_snapshot,
             fetch_remotes,
             open_remote,
+            prepare_t3_thread,
+            start_t3_thread,
+            open_t3_instructions,
             commit_detail,
             worktree_detail,
             resolve_commit,

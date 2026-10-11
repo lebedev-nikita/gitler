@@ -31,6 +31,7 @@ import { AppTooltip } from "@/components/AppTooltip";
 import { isDemo, repositoryApi } from "@/lib/repository";
 import type { DeleteBranchPlan, DiscardPlan, GraphAction, Snapshot } from "@/lib/models";
 import { shortPath } from "./common";
+import { ThreadActions } from "./ThreadActions";
 
 function savedCodexPath() {
   try {
@@ -40,13 +41,25 @@ function savedCodexPath() {
   }
 }
 
-export function GraphActions({
+type GraphActionsProps = {
+  action: GraphAction;
+  snapshot: Snapshot;
+  close: () => void;
+  changed: () => Promise<void>;
+};
+
+export function GraphActions(props: GraphActionsProps) {
+  if (props.action.kind === "thread") return <ThreadActions {...props} action={props.action} />;
+  return <BranchActions {...props} action={props.action} />;
+}
+
+function BranchActions({
   action,
   snapshot,
   close,
   changed,
 }: {
-  action: GraphAction;
+  action: Exclude<GraphAction, { kind: "thread" }>;
   snapshot: Snapshot;
   close: () => void;
   changed: () => Promise<void>;

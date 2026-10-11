@@ -10,6 +10,8 @@ import {
   DiffSchema,
   MediaSchema,
   SnapshotSchema,
+  ThreadPreparationSchema,
+  ThreadLaunchSchema,
 } from "./models";
 import type {
   Comparison,
@@ -181,6 +183,24 @@ const action = Effect.fn("repositoryAction")(function* <A, I>(
 });
 
 export const repositoryApi = {
+  prepareThread: (commonDir: string, branch: string) =>
+    runtime.runPromise(action(commonDir, "prepare_t3_thread", { branch }, ThreadPreparationSchema)),
+  startThread: (
+    commonDir: string,
+    branch: string,
+    expectedHead: string,
+    expectedWorktree: string | null,
+  ) =>
+    runtime.runPromise(
+      action(
+        commonDir,
+        "start_t3_thread",
+        { branch, expectedHead, expectedWorktree },
+        ThreadLaunchSchema,
+      ),
+    ),
+  openThreadInstructions: (commonDir: string) =>
+    runtime.runPromise(action(commonDir, "open_t3_instructions", {}, Schema.Null)),
   fetchRemotes: (commonDir: string) =>
     runtime.runPromise(action(commonDir, "fetch_remotes", {}, Schema.Null)),
   openRemote: (commonDir: string, name: string) =>

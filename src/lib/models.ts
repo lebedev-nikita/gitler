@@ -171,6 +171,21 @@ export const DeleteBranchPlanSchema = Schema.Struct({
 });
 export type DeleteBranchPlan = typeof DeleteBranchPlanSchema.Type;
 export type GraphAction =
+  | { kind: "thread"; branch: string; worktree: string | null }
   | { kind: "rename"; branch: string; worktree: string | null }
   | { kind: "delete"; branch: string; worktree: string | null }
   | { kind: "discard"; worktree: string };
+
+export const ThreadPreparationSchema = Schema.Struct({
+  available: Schema.Boolean,
+  head: Schema.NullOr(Schema.String),
+  worktree: Schema.NullOr(Schema.String),
+  message: Schema.NullOr(Schema.String),
+});
+export type ThreadPreparation = typeof ThreadPreparationSchema.Type;
+
+export const ThreadLaunchSchema = Schema.Struct({
+  reference: Schema.String,
+  worktree: Schema.String,
+  openError: Schema.NullOr(Schema.String),
+});

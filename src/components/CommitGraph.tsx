@@ -6,6 +6,7 @@ import {
   Copy,
   GitCompareArrows,
   GitFork,
+  MessageSquarePlus,
   Search,
   SlidersHorizontal,
   Pencil,
@@ -517,6 +518,17 @@ export function CommitGraph({
                         <>
                           <ContextMenuSeparator />
                           <ContextMenuGroup>
+                            {branches.map((branch) => (
+                              <ContextMenuItem
+                                key={`thread:${branch}`}
+                                onClick={() => act({ kind: "thread", branch, worktree: null })}
+                              >
+                                <MessageSquarePlus />
+                                {branches.length === 1
+                                  ? "New T3 Code thread…"
+                                  : `New T3 Code thread from ${branch}…`}
+                              </ContextMenuItem>
+                            ))}
                             {branches.map((branch) => (
                               <ContextMenuItem
                                 key={branch}
