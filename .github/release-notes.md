@@ -1,10 +1,14 @@
-Gitler 0.4.5-rc.1 is a release candidate with a clearer base-folder copy action and shared toolbar tooltips.
+Gitler 0.5.0 adds native T3 Code thread creation from a selected local branch.
 
 ## Changes
 
-- Use a FolderCopy icon for copying the full base repository folder path beside the repository name.
-- Show a checkmark after copying; keep path details and clipboard errors in the shared tooltip.
-- Include the shared tooltip improvements from main, with a consistent 500 ms delay.
+- Choose **New T3 Code thread…** in a local branch context menu to create an empty thread named after the branch.
+- Reuse the branch’s registered worktree, including local edits. If none exists, create a worktree for that same branch without changing existing branches, indexes, or working files.
+- Connect directly to the running T3 Code server; no third-party CLI is required. Inherit the T3 project’s model and permission settings.
+- Show connection and installation guidance when T3 Code is unavailable. Validate the branch and worktree again before creation, and retain a created worktree if the request fails.
+- Include the base-folder copy action and shared tooltip improvements from 0.4.5-rc.1.
+
+The integration supports T3 Code orchestration protocol 1, including T3 Code 0.0.45. After creating a thread, Gitler opens T3 Code; select the branch-named thread there.
 
 ## Downloads
 
