@@ -1,3 +1,4 @@
+import { AppTooltip } from "@/components/AppTooltip";
 import { useMemo } from "react";
 import { FileCode2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -13,9 +14,9 @@ export function DiffView({ diff, file }: { diff: DiffResult; file: string }) {
     <div className="flex-1 min-h-0 flex flex-col">
       <div className="flex gap-[8px] items-center py-0 px-[15px] h-[39px] flex-none bg-secondary">
         <FileCode2 className="size-[14px] text-muted-foreground flex-none" />
-        <span className="flex-1 truncate font-mono text-[10px]" title={file}>
-          {file}
-        </span>
+        <AppTooltip content={file}>
+          <span className="flex-1 truncate font-mono text-[10px]">{file}</span>
+        </AppTooltip>
         <div className="flex gap-[8px] font-mono text-[10px]">
           <span className="text-added">+{additions}</span>
           <span className="text-removed">−{deletions}</span>

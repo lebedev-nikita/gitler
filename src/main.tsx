@@ -36,7 +36,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ErrorBoundary>
       <QueryClientProvider client={client}>
-        <TooltipProvider delay={400}>
+        <TooltipProvider>
           <App />
         </TooltipProvider>
       </QueryClientProvider>

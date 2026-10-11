@@ -1,3 +1,4 @@
+import { AppTooltip } from "@/components/AppTooltip";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
@@ -211,27 +212,28 @@ export function CommitGraph({
           <InputGroupAddon>
             <Search />
           </InputGroupAddon>
-          <InputGroupInput
-            ref={searchRef}
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              scroll.current?.scrollTo(0, 0);
-            }}
-            onKeyDown={async (event) => {
-              if (event.key !== "Enter" || !/^[a-f0-9]{4,64}$/i.test(search.trim())) return;
-              try {
-                await jump(search.trim());
-                setSearch("");
-                setJumpError(null);
-              } catch (error) {
-                setJumpError(error instanceof Error ? error.message : String(error));
-              }
-            }}
-            title="Search loaded history. Enter a commit hash and press Enter to inspect any commit."
-            placeholder="Search commits, branches, authors…"
-            aria-label="Search loaded commits"
-          />
+          <AppTooltip content="Search loaded history. Enter a commit hash and press Enter to inspect any commit.">
+            <InputGroupInput
+              ref={searchRef}
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                scroll.current?.scrollTo(0, 0);
+              }}
+              onKeyDown={async (event) => {
+                if (event.key !== "Enter" || !/^[a-f0-9]{4,64}$/i.test(search.trim())) return;
+                try {
+                  await jump(search.trim());
+                  setSearch("");
+                  setJumpError(null);
+                } catch (error) {
+                  setJumpError(error instanceof Error ? error.message : String(error));
+                }
+              }}
+              placeholder="Search commits, branches, authors…"
+              aria-label="Search loaded commits"
+            />
+          </AppTooltip>
           {search && (
             <InputGroupAddon align="inline-end">
               <Button
@@ -439,15 +441,18 @@ export function CommitGraph({
                         </span>
                         <span className="flex items-center flex-none gap-[5px] max-w-[48%] overflow-hidden narrow:max-w-full narrow:empty:hidden">
                           {integration && (
-                            <Badge
-                              variant="integrated"
-                              className="h-[18px] py-0 px-[5px] rounded-[4px] text-[10px] leading-[1.333333]"
-                              data-integration="ancestry"
-                              title={`This branch is part of ${integration.target}'s commit history.`}
+                            <AppTooltip
+                              content={`This branch is part of ${integration.target}'s commit history.`}
                             >
-                              <Check data-icon="inline-start" aria-hidden="true" />
-                              {`Merged into ${integration.target}`}
-                            </Badge>
+                              <Badge
+                                variant="integrated"
+                                className="h-[18px] py-0 px-[5px] rounded-[4px] text-[10px] leading-[1.333333]"
+                                data-integration="ancestry"
+                              >
+                                <Check data-icon="inline-start" aria-hidden="true" />
+                                {`Merged into ${integration.target}`}
+                              </Badge>
+                            </AppTooltip>
                           )}
                           {row.node.worktree ? (
                             <>

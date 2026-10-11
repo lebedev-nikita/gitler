@@ -56,8 +56,8 @@ test("marks merged branches without hiding working changes", async ({ page }) =>
     .locator("[data-node-id]")
     .filter({ hasText: "Handle renamed files in status parser" });
   await expect(branch).toContainText("Merged into main");
-  await expect(branch.locator('[data-integration="ancestry"]')).toHaveAttribute(
-    "title",
+  await branch.locator('[data-integration="ancestry"]').hover();
+  await expect(page.locator('[data-slot="tooltip-content"][data-open]')).toHaveText(
     /part of main's commit history/i,
   );
   await expect(branch.locator("svg circle").first()).not.toHaveAttribute("cx", "20");

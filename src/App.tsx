@@ -37,7 +37,7 @@ import type { InspectorView } from "@/components/Inspector";
 import { ResizableSplit } from "@/components/ResizableSplit";
 import { useNarrowLayout, useStoredBoolean } from "@/hooks/use-layout";
 import { CopyButton, ErrorMessage, Loading, shortPath } from "@/components/common";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { AppTooltip } from "@/components/AppTooltip";
 import { DEMO_PATH } from "@/lib/demo";
 import { desktop, localRepository, isDemo, repositoryApi } from "@/lib/repository";
 import { selectionId } from "@/lib/models";
@@ -309,28 +309,31 @@ export default function App() {
         <span className="h-[17px] w-[1px] my-0 mx-[3px] bg-border" />
         <div className="flex items-center gap-[3px] min-w-0">
           {primaryRemote?.webUrl ? (
-            <a
-              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "min-w-0 shrink")}
-              href={primaryRemote.webUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`Open ${snapshot!.name} on ${remoteLabel}`}
-              aria-disabled={demo || undefined}
-              title={
+            <AppTooltip
+              content={
                 demo
                   ? "Demo remote — open a local repository to use this action"
                   : primaryRemote.webUrl
               }
-              onClick={(event) => {
-                event.preventDefault();
-                if (!demo) void openRemote(primaryRemote.name);
-              }}
             >
-              <GitBranch data-icon="inline-start" />
-              <span className="truncate">{snapshot!.name}</span>
-              <span className="compact:hidden">{remoteLabel}</span>
-              <ExternalLink data-icon="inline-end" />
-            </a>
+              <a
+                className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "min-w-0 shrink")}
+                href={primaryRemote.webUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Open ${snapshot!.name} on ${remoteLabel}`}
+                aria-disabled={demo || undefined}
+                onClick={(event) => {
+                  event.preventDefault();
+                  if (!demo) void openRemote(primaryRemote.name);
+                }}
+              >
+                <GitBranch data-icon="inline-start" />
+                <span className="truncate">{snapshot!.name}</span>
+                <span className="compact:hidden">{remoteLabel}</span>
+                <ExternalLink data-icon="inline-end" />
+              </a>
+            </AppTooltip>
           ) : (
             <span className="flex items-center gap-[5px] min-w-0 text-[12px]">
               <GitBranch className="size-[13px] flex-none" />
@@ -356,59 +359,59 @@ export default function App() {
           </Badge>
         )}
         <div className="flex-1" />
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="outline"
-                size="icon-sm"
-                aria-label="Open repository"
-                aria-keyshortcuts="Meta+O Control+O"
-                onClick={() => {
-                  setInputPath("");
-                  setOpenError(null);
-                  setOpenDialog(true);
-                }}
-              >
-                <FolderOpen />
-              </Button>
-            }
-          />
-          <TooltipContent>Open repository (⌘ / Ctrl O)</TooltipContent>
-        </Tooltip>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Refresh repository"
-          title="Refresh (⌘/Ctrl R)"
-          disabled={!path || refreshBusy}
-          onClick={() => {
-            void refreshRepository();
-          }}
+        <AppTooltip content="Open repository (⌘ / Ctrl O)">
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label="Open repository"
+            aria-keyshortcuts="Meta+O Control+O"
+            onClick={() => {
+              setInputPath("");
+              setOpenError(null);
+              setOpenDialog(true);
+            }}
+          >
+            <FolderOpen />
+          </Button>
+        </AppTooltip>
+        <AppTooltip content="Refresh (⌘/Ctrl R)">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Refresh repository"
+            disabled={!path || refreshBusy}
+            onClick={() => {
+              void refreshRepository();
+            }}
+          >
+            <RefreshCw className={refreshBusy ? "animate-spin" : undefined} />
+          </Button>
+        </AppTooltip>
+        <AppTooltip
+          content={inspectorOpen ? "Hide details panel (⌘⌥B)" : "Show details panel (⌘⌥B)"}
         >
-          <RefreshCw className={refreshBusy ? "animate-spin" : undefined} />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={inspectorOpen ? "Hide details panel" : "Show details panel"}
-          title={inspectorOpen ? "Hide details panel (⌘⌥B)" : "Show details panel (⌘⌥B)"}
-          aria-keyshortcuts="Meta+Alt+B"
-          aria-expanded={inspectorOpen && !!selected}
-          disabled={!snapshot || !selected}
-          onClick={() => setInspectorOpen((value) => !value)}
-        >
-          {inspectorOpen ? <PanelRightClose /> : <PanelRightOpen />}
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Keyboard shortcuts"
-          title="Keyboard shortcuts (?)"
-          onClick={() => setShortcutsDialog(true)}
-        >
-          <Info />
-        </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={inspectorOpen ? "Hide details panel" : "Show details panel"}
+            aria-keyshortcuts="Meta+Alt+B"
+            aria-expanded={inspectorOpen && !!selected}
+            disabled={!snapshot || !selected}
+            onClick={() => setInspectorOpen((value) => !value)}
+          >
+            {inspectorOpen ? <PanelRightClose /> : <PanelRightOpen />}
+          </Button>
+        </AppTooltip>
+        <AppTooltip content="Keyboard shortcuts (?)">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Keyboard shortcuts"
+            onClick={() => setShortcutsDialog(true)}
+          >
+            <Info />
+          </Button>
+        </AppTooltip>
       </header>
       {!path && opening ? (
         <div className="flex-1 grid place-items-center p-[30px]">
@@ -595,28 +598,29 @@ export default function App() {
         </span>
         <div className="flex items-center gap-[10px] min-w-0">
           {snapshot && !demo && snapshot.remotes.length > 0 && (
-            <button
-              className={cn(
-                "inline-flex items-center gap-[5px] flex-none",
-                remoteSync.isError && "text-destructive",
-              )}
-              onClick={() => setRemotesDialog(true)}
-              title="Remote updates"
-            >
-              <CloudDownload className="size-[12px]" />
-              {remoteSync.isFetching
-                ? "Updating remotes…"
-                : remoteSync.isError
-                  ? "Remote update failed"
-                  : remoteSync.dataUpdatedAt
-                    ? `Remotes updated ${new Date(remoteSync.dataUpdatedAt).toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit" })}`
-                    : "Remote update pending"}
-            </button>
+            <AppTooltip content="Remote updates">
+              <button
+                className={cn(
+                  "inline-flex items-center gap-[5px] flex-none",
+                  remoteSync.isError && "text-destructive",
+                )}
+                onClick={() => setRemotesDialog(true)}
+              >
+                <CloudDownload className="size-[12px]" />
+                {remoteSync.isFetching
+                  ? "Updating remotes…"
+                  : remoteSync.isError
+                    ? "Remote update failed"
+                    : remoteSync.dataUpdatedAt
+                      ? `Remotes updated ${new Date(remoteSync.dataUpdatedAt).toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit" })}`
+                      : "Remote update pending"}
+              </button>
+            </AppTooltip>
           )}
           {snapshot && (
-            <span className="font-mono truncate compact:hidden" title={snapshot.commonDir}>
-              {shortPath(snapshot.path)}
-            </span>
+            <AppTooltip content={snapshot.commonDir}>
+              <span className="font-mono truncate compact:hidden">{shortPath(snapshot.path)}</span>
+            </AppTooltip>
           )}
         </div>
       </footer>
@@ -735,19 +739,20 @@ export default function App() {
                     <div className="flex items-center justify-between gap-[8px]">
                       <strong>{remote.name}</strong>
                       {remote.webUrl && (
-                        <Button
-                          variant="ghost"
-                          size="xs"
-                          disabled={demo}
-                          title={remote.webUrl}
-                          aria-label={`Open ${remote.name} repository in browser`}
-                          onClick={() => {
-                            void openRemote(remote.name);
-                          }}
-                        >
-                          <ExternalLink data-icon="inline-start" />
-                          Open in browser
-                        </Button>
+                        <AppTooltip content={remote.webUrl}>
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            disabled={demo}
+                            aria-label={`Open ${remote.name} repository in browser`}
+                            onClick={() => {
+                              void openRemote(remote.name);
+                            }}
+                          >
+                            <ExternalLink data-icon="inline-start" />
+                            Open in browser
+                          </Button>
+                        </AppTooltip>
                       )}
                     </div>
                     <code className="text-muted-foreground text-[10px] wrap-anywhere">
