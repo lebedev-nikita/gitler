@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::collections::HashSet;
+use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -69,8 +69,6 @@ pub struct Reference {
 #[serde(rename_all = "camelCase")]
 pub struct BranchIntegration {
     pub target: String,
-    pub kind: String,
-    pub commit: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -96,6 +94,7 @@ pub struct Snapshot {
     pub common_dir: String,
     pub path: String,
     pub worktrees: Vec<Worktree>,
+    pub worktree_status_pending: bool,
     pub commits: Vec<Commit>,
     pub refs: Vec<Reference>,
     pub stashes: Vec<Stash>,
@@ -445,6 +444,20 @@ fn execute_with_output_policy(
     Ok(bytes)
 }
 
+#[cfg(all(test, unix))]
+mod output_tests {
+    use super::*;
+
+    #[test]
+    fn truncated_output_still_checks_the_producers_exit_status() {
+        let mut command = Command::new("sh");
+        command.args(["-c", "printf abcdef; printf failure >&2; exit 7"]);
+        let error =
+            execute_with_output_policy(command, false, OutputPolicy::Truncate(3)).unwrap_err();
+        assert_eq!(error, "failure");
+    }
+}
+
 fn in_worktree(path: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
     let mut command = git_command();
     command.arg("-C").arg(path).args(args);
@@ -769,36 +782,48 @@ pub fn fetch_remotes(common_dir: &str) -> Result<(), String> {
 }
 
 pub fn snapshot(path: &str, limit: usize) -> Result<Snapshot, String> {
+    snapshot_with_status(path, limit, true)
+}
+
+pub fn snapshot_with_status(
+    path: &str,
+    limit: usize,
+    include_worktree_status: bool,
+) -> Result<Snapshot, String> {
     let common = resolve_common(path)?;
     let limit = limit.clamp(50, 20000);
     let mut worktrees = parse_worktrees(&in_repo(
         &common,
         &["worktree", "list", "--porcelain", "-z"],
     )?);
-    for batch in worktrees.chunks_mut(8) {
-        std::thread::scope(|scope| {
-            for tree in batch {
-                scope.spawn(move || {
-                    if tree.bare {
-                        return;
-                    }
-                    match in_worktree(
-                        Path::new(&tree.path),
-                        &[
-                            "status",
-                            "--porcelain=v1",
-                            "-z",
-                            "--untracked-files=all",
-                            "--ignore-submodules=none",
-                        ],
-                    ) {
-                        Ok(bytes) => tree.files = parse_status(&bytes),
-                        Err(error) => tree.error = Some(error),
-                    }
-                });
-            }
-        });
+    if include_worktree_status {
+        for batch in worktrees.chunks_mut(8) {
+            std::thread::scope(|scope| {
+                for tree in batch {
+                    scope.spawn(move || {
+                        if tree.bare {
+                            return;
+                        }
+                        match in_worktree(
+                            Path::new(&tree.path),
+                            &[
+                                "status",
+                                "--porcelain=v1",
+                                "-z",
+                                "--untracked-files=all",
+                                "--ignore-submodules=none",
+                            ],
+                        ) {
+                            Ok(bytes) => tree.files = parse_status(&bytes),
+                            Err(error) => tree.error = Some(error),
+                        }
+                    });
+                }
+            });
+        }
     }
+    let worktree_status_pending =
+        !include_worktree_status && worktrees.iter().any(|tree| !tree.bare);
     let mut commits = log_commits(&common, &worktrees, limit)?;
     let has_more = commits.len() > limit;
     commits.truncate(limit);
@@ -921,6 +946,7 @@ pub fn snapshot(path: &str, limit: usize) -> Result<Snapshot, String> {
         common_dir: common.to_string_lossy().into_owned(),
         path: root,
         worktrees,
+        worktree_status_pending,
         commits,
         refs,
         stashes,
@@ -933,8 +959,7 @@ pub fn snapshot(path: &str, limit: usize) -> Result<Snapshot, String> {
     })
 }
 
-// Integration is independent of the loaded graph page. Only confirmed matches
-// are annotated; shallow, unrelated, oversized, or failed comparisons stay unknown.
+// Merge status is based only on commit ancestry, independently of the loaded graph page.
 fn annotate_integrations(common: &Path, refs: &mut [Reference]) {
     let candidates = [
         "refs/heads/main",
@@ -974,8 +999,6 @@ fn annotate_integrations(common: &Path, refs: &mut [Reference]) {
         return;
     };
     let merged: HashSet<_> = string(&merged).lines().map(str::to_owned).collect();
-    let mut by_tip = HashMap::new();
-    let mut by_base = HashMap::new();
     for reference in refs {
         if reference.kind == "tag"
             || reference.full_name == target.full_name
@@ -988,150 +1011,10 @@ fn annotate_integrations(common: &Path, refs: &mut [Reference]) {
         if Some(&reference.name) == upstream_name.as_ref() {
             continue;
         }
-        let integration = by_tip.entry(reference.oid.clone()).or_insert_with(|| {
-            if merged.contains(&reference.oid) {
-                return Some(BranchIntegration {
-                    target: target.name.clone(),
-                    kind: "ancestry".into(),
-                    commit: None,
-                });
-            }
-            equivalent_integration(common, &target, &reference.oid, &mut by_base)
-                .ok()
-                .flatten()
-        });
-        reference.integration = integration.clone();
-    }
-}
-
-fn patch_ids(bytes: &[u8]) -> Result<HashMap<String, String>, String> {
-    // Use an anonymous temporary file as stdin so large patches cannot deadlock
-    // the existing bounded subprocess reader. No Git objects or refs are written.
-    let mut input = tempfile::tempfile().map_err(|error| error.to_string())?;
-    input.write_all(bytes).map_err(|error| error.to_string())?;
-    input
-        .seek(SeekFrom::Start(0))
-        .map_err(|error| error.to_string())?;
-    let mut command = git_command();
-    // Preserve whitespace: indentation-only changes can be semantically different.
-    command.args(["patch-id", "--verbatim"]).stdin(input);
-    Ok(string(&execute(command)?)
-        .lines()
-        .filter_map(|line| {
-            let (patch, oid) = line.split_once(' ')?;
-            Some((patch.to_owned(), oid.to_owned()))
-        })
-        .collect())
-}
-
-fn range_commits(common: &Path, range: &str) -> Result<Vec<Vec<String>>, String> {
-    let bytes = in_repo(
-        common,
-        &["rev-list", "--parents", "--max-count=2001", range, "--"],
-    )?;
-    let commits: Vec<_> = string(&bytes)
-        .lines()
-        .map(|line| line.split_whitespace().map(str::to_owned).collect())
-        .collect();
-    if commits.len() > 2000 {
-        return Err("Integration comparison exceeds 2000 commits".into());
-    }
-    Ok(commits)
-}
-
-fn range_patches(common: &Path, range: &str) -> Result<HashMap<String, String>, String> {
-    patch_ids(&in_repo(
-        common,
-        &[
-            "log",
-            "--format=%H",
-            "--no-merges",
-            "-p",
-            "--binary",
-            "--no-renames",
-            "--no-ext-diff",
-            "--no-textconv",
-            "--no-relative",
-            "--no-color",
-            "--ignore-submodules=none",
-            "--submodule=short",
-            "--unified=0",
-            range,
-            "--",
-        ],
-    )?)
-}
-
-fn equivalent_integration(
-    common: &Path,
-    target: &Reference,
-    tip: &str,
-    by_base: &mut HashMap<String, Option<HashMap<String, String>>>,
-) -> Result<Option<BranchIntegration>, String> {
-    let base = string(&in_repo(
-        common,
-        &["merge-base", "--all", &target.oid, tip],
-    )?)
-    .trim()
-    .to_owned();
-    // Multiple merge bases need more than a patch comparison; remain conservative.
-    if base.lines().count() != 1 {
-        return Ok(None);
-    }
-    let branch_range = format!("{}..{tip}", target.oid);
-    let branch_commits = range_commits(common, &branch_range)?;
-    let main_range = format!("{base}..{}", target.oid);
-    let main_patches = by_base.entry(base.clone()).or_insert_with(|| {
-        range_commits(common, &main_range)
-            .and_then(|_| range_patches(common, &main_range))
-            .ok()
-    });
-    let Some(main_patches) = main_patches else {
-        return Ok(None);
-    };
-    let aggregate = patch_ids(&in_repo(
-        common,
-        &[
-            "diff",
-            "--binary",
-            "--no-renames",
-            "--no-ext-diff",
-            "--no-textconv",
-            "--no-relative",
-            "--no-color",
-            "--ignore-submodules=none",
-            "--submodule=short",
-            "--unified=0",
-            &base,
-            tip,
-            "--",
-        ],
-    )?)?;
-    if let Some(commit) = aggregate.keys().find_map(|patch| main_patches.get(patch)) {
-        return Ok(Some(BranchIntegration {
+        reference.integration = merged.contains(&reference.oid).then(|| BranchIntegration {
             target: target.name.clone(),
-            kind: "patch".into(),
-            commit: Some(commit.clone()),
-        }));
+        });
     }
-    // Rebase/cherry-pick integration requires every branch-only commit to match.
-    // Merge resolutions and empty commits cannot be inferred from leaf patches.
-    if branch_commits.is_empty() || branch_commits.iter().any(|commit| commit.len() != 2) {
-        return Ok(None);
-    }
-    let branch_patches = range_patches(common, &branch_range)?;
-    if branch_patches.len() != branch_commits.len()
-        || !branch_patches
-            .keys()
-            .all(|patch| main_patches.contains_key(patch))
-    {
-        return Ok(None);
-    }
-    Ok(Some(BranchIntegration {
-        target: target.name.clone(),
-        kind: "patch".into(),
-        commit: None,
-    }))
 }
 
 fn diff_files(common: &Path, oid: &str, base: Option<&str>) -> Result<Vec<FileChange>, String> {

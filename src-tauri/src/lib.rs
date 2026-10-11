@@ -65,10 +65,16 @@ async fn open_repository(
 }
 
 #[tauri::command]
-async fn repository_snapshot(path: String, limit: usize) -> Result<git::Snapshot, String> {
-    tauri::async_runtime::spawn_blocking(move || git::snapshot(&path, limit))
-        .await
-        .map_err(|error| error.to_string())?
+async fn repository_snapshot(
+    path: String,
+    limit: usize,
+    include_worktree_status: Option<bool>,
+) -> Result<git::Snapshot, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git::snapshot_with_status(&path, limit, include_worktree_status.unwrap_or(true))
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]

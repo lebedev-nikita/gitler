@@ -10,6 +10,7 @@ TypeScript, and shadcn/ui. Currently supported only on macOS with Apple Silicon.
 ## What it does
 
 - Shows uncommitted changes as amber graph nodes attached to each worktree's HEAD.
+- Opens the commit graph first, then checks working copies in the background.
 - Surfaces detached, locked, and unavailable working copies in repository metadata.
 - Inspects staged, unstaged, and untracked files without switching branches.
 - Compares two commits or a commit and a worktree's current files: select one node,
@@ -27,10 +28,9 @@ labels; filters appear only when you open **Filters**. To inspect or compare a
 commit outside the loaded history, enter its hash in search and press Enter. It
 stays in the graph for selection and right-click comparisons.
 
-Branch labels show **Merged into main** for commits in the main branch's history,
-or **Changes in main** when all committed changes match after squash, rebase, or
-cherry-pick. The graph preserves the original commit connections. Uncommitted
-work remains visible separately.
+Branch labels show **Merged into main** when their commits are part of the main
+branch's history. Squash merges and GitHub's **Rebase and merge** are not automatically
+recognized. Uncommitted work remains visible separately.
 
 Drag the boundary between the graph and inspector, or between the file list and
 diff preview, to resize the panels. The toolbar toggles the entire inspector;

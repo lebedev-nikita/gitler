@@ -1,18 +1,19 @@
 import { expect, test } from "@playwright/test";
 import { demoDetail, demoDiff, demoSnapshot } from "../src/lib/demo";
 
-test("marks squash-integrated branches without inventing graph edges or hiding working changes", async ({
-  page,
-}) => {
+test("marks merged branches without hiding working changes", async ({ page }) => {
   const demo = demoSnapshot();
   const feature = demo.refs[1];
   const target = demo.refs[0];
   const integrated = {
     ...feature,
-    integration: { target: "main", kind: "patch" as const, commit: target.oid },
+    integration: { target: "main" },
   };
   const snapshot = {
     ...demo,
+    commits: demo.commits.map((commit) =>
+      commit.oid === target.oid ? { ...commit, parents: [...commit.parents, feature.oid] } : commit,
+    ),
     refs: demo.refs.map((ref) => (ref === feature ? integrated : ref)),
   };
   const detail = demoDetail("", null, snapshot.worktrees[1].path);
@@ -54,10 +55,10 @@ test("marks squash-integrated branches without inventing graph edges or hiding w
   const branch = page
     .locator("[data-node-id]")
     .filter({ hasText: "Handle renamed files in status parser" });
-  await expect(branch).toContainText("Changes in main");
-  await expect(branch.locator('[data-integration="patch"]')).toHaveAttribute(
+  await expect(branch).toContainText("Merged into main");
+  await expect(branch.locator('[data-integration="ancestry"]')).toHaveAttribute(
     "title",
-    /squash or rebase/i,
+    /part of main's commit history/i,
   );
   await expect(branch.locator("svg circle").first()).not.toHaveAttribute("cx", "20");
   await expect(
@@ -65,12 +66,12 @@ test("marks squash-integrated branches without inventing graph edges or hiding w
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Uncommitted changes on agent/auth-flow", exact: true }),
-  ).not.toContainText("Changes in main");
+  ).not.toContainText("Merged into main");
   await expect(
     page.getByRole("button", { name: "Improve Git parsing for linked worktrees", exact: true }),
-  ).not.toContainText("Changes in main");
+  ).not.toContainText("Merged into main");
   await page.screenshot({ path: ".impeccable/review/integration-desktop.png", fullPage: true });
   await page.setViewportSize({ width: 1024, height: 768 });
-  await expect(branch).toContainText("Changes in main");
+  await expect(branch).toContainText("Merged into main");
   await page.screenshot({ path: ".impeccable/review/integration-narrow.png", fullPage: true });
 });

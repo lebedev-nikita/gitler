@@ -75,7 +75,18 @@ describe.runIf(process.platform === "darwin" && process.arch === "arm64")(
     it("loads real history and linked worktrees without changing the index", async () => {
       const index = await readFile(join(commonDir, "index"));
       expect(await call("open_repository", { path: linked })).toBe(linked);
+      const history: Snapshot = await call("repository_snapshot", {
+        path: linked,
+        limit: 400,
+        includeWorktreeStatus: false,
+      });
+      expect(history.worktreeStatusPending).toBe(true);
+      expect(history.worktrees.every((tree) => tree.files.length === 0)).toBe(true);
+      expect(history.commits[0].subject).toBe("Real browser fixture commit");
+      expect(await readFile(join(commonDir, "index"))).toEqual(index);
       const snapshot: Snapshot = await call("repository_snapshot", { path: linked, limit: 400 });
+      expect(snapshot.worktreeStatusPending).toBe(false);
+      expect(snapshot.worktrees.find((tree) => tree.path === repository)?.files).toHaveLength(1);
       expect(snapshot.commonDir).toBe(commonDir);
       expect(snapshot.commits[0].subject).toBe("Real browser fixture commit");
       expect(snapshot.worktrees.map((tree) => tree.path)).toEqual(

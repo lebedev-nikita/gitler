@@ -171,7 +171,7 @@ export default function App() {
         }
         const result = await queryClient.fetchQuery({
           queryKey: ["repository", target, 400],
-          queryFn: () => repositoryApi.snapshot(target, 400),
+          queryFn: () => repositoryApi.snapshot(target, 400, false),
           staleTime: 0,
         });
         if (sequence !== requestSequence.current) return;
@@ -386,7 +386,11 @@ export default function App() {
           <Info />
         </Button>
       </header>
-      {!path ? (
+      {!path && opening ? (
+        <div className="flex-1 grid place-items-center p-[30px]">
+          <Loading text="Reading repository history…" />
+        </div>
+      ) : !path ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-[24px] py-[40px] px-[24px]">
           <div className="size-[64px] grid place-items-center text-primary bg-card border border-border rounded-[12px]">
             <GitFork className="size-[34px] [stroke-width:1.3]" />
@@ -427,7 +431,7 @@ export default function App() {
               }}
             />
           ) : (
-            <Loading text="Scanning repository and working copies…" />
+            <Loading text="Reading repository history…" />
           )}
         </div>
       ) : (
@@ -551,13 +555,19 @@ export default function App() {
               repository.isError ? "bg-destructive" : "bg-primary",
             )}
           />
-          {refreshBusy
-            ? "Refreshing repository…"
-            : repository.isError
-              ? "Refresh failed — showing the last available scan"
-              : snapshot
-                ? `Scanned ${new Date(snapshot.scannedAt * 1000).toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit" })}`
-                : "Ready to open a repository"}
+          <span role={snapshot?.worktreeStatusPending ? "status" : undefined}>
+            {refreshBusy
+              ? "Refreshing repository…"
+              : repository.isError
+                ? snapshot?.worktreeStatusPending
+                  ? "Could not check working copies — retry Refresh"
+                  : "Refresh failed — showing the last available scan"
+                : snapshot?.worktreeStatusPending
+                  ? "Checking working copies…"
+                  : snapshot
+                    ? `Scanned ${new Date(snapshot.scannedAt * 1000).toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit" })}`
+                    : "Ready to open a repository"}
+          </span>
         </span>
         <div className="flex items-center gap-[10px] min-w-0">
           {snapshot && !demo && snapshot.remotes.length > 0 && (
@@ -705,9 +715,13 @@ export default function App() {
                     >
                       {tree.error
                         ? "Unavailable"
-                        : tree.files.length
-                          ? `${tree.files.length} changes`
-                          : "Clean"}
+                        : snapshot.worktreeStatusPending && !tree.bare
+                          ? repository.isError
+                            ? "Status unknown"
+                            : "Checking…"
+                          : tree.files.length
+                            ? `${tree.files.length} changes`
+                            : "Clean"}
                     </Badge>
                   </div>
                   <p className="text-[10px] text-muted-foreground font-mono mt-[6px] mr-0 mb-0 ml-[20px] wrap-anywhere">
