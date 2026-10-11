@@ -1,12 +1,10 @@
-Gitler 0.4.4 makes repository links and the base folder path available directly in the toolbar.
+Gitler 0.4.5-rc.1 is a release candidate with a clearer base-folder copy action and shared toolbar tooltips.
 
 ## Changes
 
-- Click the repository name to open GitHub or another supported Git remote.
-- Copy the full base repository folder path beside the name, even when opening a linked worktree.
-- Preserve the native link context menu, including Copy Link in the macOS app.
-- Replace the Open repository text button with a compact folder icon and keyboard-shortcut tooltip.
-- Remove the repository-wide information dialog; remote addresses and update errors remain available from the footer.
+- Use a FolderCopy icon for copying the full base repository folder path beside the repository name.
+- Show a checkmark after copying; keep path details and clipboard errors in the shared tooltip.
+- Include the shared tooltip improvements from main, with a consistent 500 ms delay.
 
 ## Downloads
 

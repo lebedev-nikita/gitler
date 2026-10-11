@@ -38,6 +38,7 @@ import { ResizableSplit } from "@/components/ResizableSplit";
 import { useNarrowLayout, useStoredBoolean } from "@/hooks/use-layout";
 import { CopyButton, ErrorMessage, Loading, shortPath } from "@/components/common";
 import { AppTooltip } from "@/components/AppTooltip";
+import { FolderCopy } from "@/components/FolderCopy";
 import { DEMO_PATH } from "@/lib/demo";
 import { desktop, localRepository, isDemo, repositoryApi } from "@/lib/repository";
 import { selectionId } from "@/lib/models";
@@ -350,6 +351,7 @@ export default function App() {
               label="Copy repository path"
               title={`Copy repository path: ${snapshot.path}`}
               size="icon-sm"
+              icon={FolderCopy}
             />
           )}
         </div>
