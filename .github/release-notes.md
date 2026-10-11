@@ -1,11 +1,10 @@
-Gitler 0.4.2 opens repository history before scanning working copies.
+Gitler 0.4.3 keeps side branches visually distinct until they join the mainline.
 
 ## Changes
 
-- Show the commit graph immediately after reading history and branches, then load working copy statuses in the background.
-- Keep history usable if a working copy scan fails, and allow retrying with Refresh. Pending statuses are shown explicitly and block worktree deletion until checked.
-- Detect merged branches through commit ancestry. Automatic matching of squash merges and GitHub rebase-and-merge commits has been removed.
-- Show progress while opening repositories from the command line.
+- Preserve a side line's color along its connection to a mainline ancestor instead of turning it coral immediately below the side commit.
+- Keep first-parent connections in the source line's color when their parent is already present in another graph lane.
+- Add regression coverage for both join orders while preserving coral mainline commits.
 
 ## Downloads
 
