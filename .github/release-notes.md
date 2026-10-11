@@ -1,10 +1,12 @@
-Gitler 0.4.3 keeps side branches visually distinct until they join the mainline.
+Gitler 0.4.4 makes repository links and the base folder path available directly in the toolbar.
 
 ## Changes
 
-- Preserve a side line's color along its connection to a mainline ancestor instead of turning it coral immediately below the side commit.
-- Keep first-parent connections in the source line's color when their parent is already present in another graph lane.
-- Add regression coverage for both join orders while preserving coral mainline commits.
+- Click the repository name to open GitHub or another supported Git remote.
+- Copy the full base repository folder path beside the name, even when opening a linked worktree.
+- Preserve the native link context menu, including Copy Link in the macOS app.
+- Replace the Open repository text button with a compact folder icon and keyboard-shortcut tooltip.
+- Remove the repository-wide information dialog; remote addresses and update errors remain available from the footer.
 
 ## Downloads
 

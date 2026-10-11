@@ -11,15 +11,25 @@ import {
 } from "@/components/ui/empty";
 import type { LucideIcon } from "lucide-react";
 
-export function CopyButton({ value, label = "Copy" }: { value: string; label?: string }) {
+export function CopyButton({
+  value,
+  label = "Copy",
+  title = label,
+  size = "icon-xs",
+}: {
+  value: string;
+  label?: string;
+  title?: string;
+  size?: "icon-xs" | "icon-sm";
+}) {
   const [copied, setCopied] = useState(false);
   const [failed, setFailed] = useState(false);
   return (
     <Button
-      size="icon-xs"
+      size={size}
       variant="ghost"
       aria-label={copied ? "Copied" : label}
-      title={failed ? "Clipboard unavailable" : copied ? "Copied" : label}
+      title={failed ? "Clipboard unavailable" : copied ? "Copied" : title}
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(value);

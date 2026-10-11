@@ -94,11 +94,10 @@ test("opens history before working copies and preserves selection as statuses ar
   await merged.click({ button: "right" });
   await expect(page.getByRole("menuitem", { name: "Delete branch and worktree…" })).toBeDisabled();
   await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: demoSnapshot().name, exact: true }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog.getByText("Clean", { exact: true })).toHaveCount(0);
-  await expect(dialog.getByText("Checking…", { exact: true })).toHaveCount(6);
-  await dialog.getByRole("button", { name: "Close" }).click();
+  await expect(
+    page.locator("header").getByRole("button", { name: demoSnapshot().name, exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByLabel("Copy repository path")).toBeVisible();
   await page.screenshot({ path: test.info().outputPath("history-first-desktop.png") });
   await page.setViewportSize({ width: 1024, height: 768 });
   await page.screenshot({ path: test.info().outputPath("history-first-narrow.png") });
@@ -129,11 +128,7 @@ test("keeps history available when the initial working copy scan fails and allow
     { timeout: 15000 },
   );
   await expect(page.getByRole("region", { name: "Commit graph" })).toBeVisible();
-  await page.getByRole("button", { name: demoSnapshot().name, exact: true }).click();
-  await expect(page.getByRole("dialog").getByText("Status unknown", { exact: true })).toHaveCount(
-    6,
-  );
-  await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("button", { name: /Uncommitted changes on/ })).toHaveCount(0);
   await page.evaluate(() => {
     (window as unknown as { opening: { fail: boolean } }).opening.fail = false;
   });
