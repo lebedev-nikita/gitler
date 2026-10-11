@@ -386,7 +386,11 @@ export default function App() {
           <Info />
         </Button>
       </header>
-      {!path ? (
+      {!path && opening ? (
+        <div className="flex-1 grid place-items-center p-[30px]">
+          <Loading text="Scanning repository and working copies…" />
+        </div>
+      ) : !path ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-[24px] py-[40px] px-[24px]">
           <div className="size-[64px] grid place-items-center text-primary bg-card border border-border rounded-[12px]">
             <GitFork className="size-[34px] [stroke-width:1.3]" />

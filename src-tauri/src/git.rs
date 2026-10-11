@@ -12,6 +12,8 @@ const DIFF_LIMIT: usize = 512 * 1024;
 #[derive(Clone, Copy)]
 enum OutputPolicy {
     Complete,
+    // Only read-only comparisons may be stopped as soon as their output is too large.
+    Bounded,
     Truncate(usize),
 }
 
@@ -377,7 +379,7 @@ fn execute_with_output_policy(
     policy: OutputPolicy,
 ) -> Result<Vec<u8>, String> {
     let limit = match policy {
-        OutputPolicy::Complete => OUTPUT_LIMIT,
+        OutputPolicy::Complete | OutputPolicy::Bounded => OUTPUT_LIMIT,
         OutputPolicy::Truncate(limit) => limit,
     };
     #[cfg(unix)]
@@ -394,6 +396,7 @@ fn execute_with_output_policy(
         })?;
     let stdout = child.stdout.take().ok_or("Git stdout unavailable")?;
     let stderr = child.stderr.take().ok_or("Git stderr unavailable")?;
+    let process_id = child.id();
     // Drain both pipes concurrently so a large history cannot deadlock Git.
     let out = std::thread::spawn(move || {
         let mut bytes = Vec::new();
@@ -406,6 +409,14 @@ fn execute_with_output_policy(
             if bytes.len() < limit + 1 {
                 let remaining = limit + 1 - bytes.len();
                 bytes.extend_from_slice(&buffer[..count.min(remaining)]);
+            }
+            if matches!(policy, OutputPolicy::Bounded) && bytes.len() > limit {
+                // SAFETY: this read-only child owns a dedicated process group.
+                #[cfg(unix)]
+                unsafe {
+                    libc::kill(-(process_id as i32), libc::SIGKILL);
+                }
+                break;
             }
         }
         bytes
@@ -428,6 +439,11 @@ fn execute_with_output_policy(
     }
     let bytes = out.join().map_err(|_| "Git reader failed")?;
     let errors = err.join().map_err(|_| "Git error reader failed")?;
+    if matches!(policy, OutputPolicy::Bounded) && bytes.len() > limit {
+        return Err(
+            "Git output exceeds 16 MiB. Narrow the history or choose a smaller file.".into(),
+        );
+    }
     let Some(status) = status else {
         return Err(
             "Git operation took longer than 30 seconds. Check the repository or network and retry."
@@ -445,6 +461,31 @@ fn execute_with_output_policy(
     Ok(bytes)
 }
 
+#[cfg(all(test, unix))]
+mod output_tests {
+    use super::*;
+    use std::time::Instant;
+
+    #[test]
+    fn oversized_comparison_stops_the_producer_before_it_finishes() {
+        let mut command = Command::new("sh");
+        command.args(["-c", "head -c 16777217 /dev/zero; sleep 5"]);
+        let started = Instant::now();
+        let error = execute_with_output_policy(command, false, OutputPolicy::Bounded).unwrap_err();
+        assert!(error.contains("output exceeds 16 MiB"), "{error}");
+        assert!(started.elapsed() < Duration::from_secs(3));
+    }
+
+    #[test]
+    fn truncated_output_still_checks_the_producers_exit_status() {
+        let mut command = Command::new("sh");
+        command.args(["-c", "printf abcdef; printf failure >&2; exit 7"]);
+        let error =
+            execute_with_output_policy(command, false, OutputPolicy::Truncate(3)).unwrap_err();
+        assert_eq!(error, "failure");
+    }
+}
+
 fn in_worktree(path: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
     let mut command = git_command();
     command.arg("-C").arg(path).args(args);
@@ -455,6 +496,12 @@ fn in_repo(common: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
     let mut command = git_command();
     command.arg("--git-dir").arg(common).args(args);
     execute(command)
+}
+
+fn in_repo_bounded(common: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
+    let mut command = git_command();
+    command.arg("--git-dir").arg(common).args(args);
+    execute_with_output_policy(command, false, OutputPolicy::Bounded)
 }
 
 fn in_repo_truncated(common: &Path, args: &[&str], limit: usize) -> Result<Vec<u8>, String> {
@@ -975,7 +1022,7 @@ fn annotate_integrations(common: &Path, refs: &mut [Reference]) {
     };
     let merged: HashSet<_> = string(&merged).lines().map(str::to_owned).collect();
     let mut by_tip = HashMap::new();
-    let mut by_base = HashMap::new();
+    let mut comparisons = IntegrationComparisons::default();
     for reference in refs {
         if reference.kind == "tag"
             || reference.full_name == target.full_name
@@ -996,11 +1043,121 @@ fn annotate_integrations(common: &Path, refs: &mut [Reference]) {
                     commit: None,
                 });
             }
-            equivalent_integration(common, &target, &reference.oid, &mut by_base)
+            equivalent_integration(common, &target, &reference.oid, &mut comparisons)
                 .ok()
                 .flatten()
         });
         reference.integration = integration.clone();
+    }
+}
+
+#[derive(Default)]
+struct IntegrationComparisons {
+    main_ranges: HashMap<String, Option<Vec<String>>>,
+    paths: HashMap<String, Vec<Vec<u8>>>,
+    patches: HashMap<String, Option<String>>,
+}
+
+impl IntegrationComparisons {
+    fn read_paths(&mut self, common: &Path, commits: &[String]) -> Result<(), String> {
+        let missing: Vec<_> = commits
+            .iter()
+            .filter(|oid| !self.paths.contains_key(*oid))
+            .cloned()
+            .collect();
+        if missing.is_empty() {
+            return Ok(());
+        }
+        let mut input = tempfile::tempfile().map_err(|error| error.to_string())?;
+        for oid in &missing {
+            writeln!(input, "{oid}").map_err(|error| error.to_string())?;
+        }
+        input
+            .seek(SeekFrom::Start(0))
+            .map_err(|error| error.to_string())?;
+        let mut command = git_command();
+        command
+            .arg("--git-dir")
+            .arg(common)
+            .args([
+                "diff-tree",
+                "--stdin",
+                "--raw",
+                "-r",
+                "-z",
+                "--root",
+                "--no-abbrev",
+                "--no-renames",
+                "--no-ext-diff",
+                "--no-textconv",
+                "--no-relative",
+                "--ignore-submodules=none",
+                "--submodule=short",
+            ])
+            .stdin(input);
+        let bytes = execute_with_output_policy(command, false, OutputPolicy::Bounded)?;
+        let mut paths: HashMap<_, Vec<Vec<u8>>> =
+            missing.into_iter().map(|oid| (oid, Vec::new())).collect();
+        let mut tokens = bytes
+            .split(|byte| *byte == 0)
+            .filter(|token| !token.is_empty());
+        let mut current = None;
+        while let Some(token) = tokens.next() {
+            if token.starts_with(b":") {
+                let path = tokens.next().ok_or("Missing integration file path")?;
+                paths
+                    .get_mut(current.ok_or("Missing integration commit")?)
+                    .ok_or("Unknown integration commit")?
+                    .push(path.to_vec());
+            } else {
+                let oid = std::str::from_utf8(token).map_err(|error| error.to_string())?;
+                if !paths.contains_key(oid) {
+                    return Err("Unknown integration commit".into());
+                }
+                current = Some(oid);
+            }
+        }
+        for paths in paths.values_mut() {
+            paths.sort();
+            paths.dedup();
+        }
+        self.paths.extend(paths);
+        Ok(())
+    }
+
+    fn matching_commit(
+        &mut self,
+        common: &Path,
+        commits: &[String],
+        paths: &[Vec<u8>],
+        patch: &str,
+    ) -> Option<String> {
+        if paths.is_empty() {
+            return None;
+        }
+        for oid in commits {
+            // Equal full patches must change the same paths. Inspect tree metadata
+            // first, so unrelated large blobs never need to be rendered as patches.
+            if self.paths.get(oid).map(Vec::as_slice) != Some(paths) {
+                continue;
+            }
+            let candidate = self.patches.entry(oid.clone()).or_insert_with(|| {
+                range_patches(common, &format!("{oid}^!"))
+                    .ok()
+                    .and_then(|patches| patches.into_keys().next())
+            });
+            if candidate.as_deref() == Some(patch) {
+                return Some(oid.clone());
+            }
+        }
+        None
+    }
+
+    fn has_candidate(&self, commits: &[String], paths: &[Vec<u8>]) -> bool {
+        !paths.is_empty()
+            && commits
+                .iter()
+                .any(|oid| self.paths.get(oid).map(Vec::as_slice) == Some(paths))
     }
 }
 
@@ -1040,7 +1197,7 @@ fn range_commits(common: &Path, range: &str) -> Result<Vec<Vec<String>>, String>
 }
 
 fn range_patches(common: &Path, range: &str) -> Result<HashMap<String, String>, String> {
-    patch_ids(&in_repo(
+    patch_ids(&in_repo_bounded(
         common,
         &[
             "log",
@@ -1066,7 +1223,7 @@ fn equivalent_integration(
     common: &Path,
     target: &Reference,
     tip: &str,
-    by_base: &mut HashMap<String, Option<HashMap<String, String>>>,
+    comparisons: &mut IntegrationComparisons,
 ) -> Result<Option<BranchIntegration>, String> {
     let base = string(&in_repo(
         common,
@@ -1081,37 +1238,77 @@ fn equivalent_integration(
     let branch_range = format!("{}..{tip}", target.oid);
     let branch_commits = range_commits(common, &branch_range)?;
     let main_range = format!("{base}..{}", target.oid);
-    let main_patches = by_base.entry(base.clone()).or_insert_with(|| {
-        range_commits(common, &main_range)
-            .and_then(|_| range_patches(common, &main_range))
-            .ok()
-    });
-    let Some(main_patches) = main_patches else {
+    let main_commits = comparisons
+        .main_ranges
+        .entry(base.clone())
+        .or_insert_with(|| {
+            range_commits(common, &main_range)
+                .map(|commits| {
+                    commits
+                        .into_iter()
+                        .filter(|commit| commit.len() <= 2)
+                        .map(|commit| commit[0].clone())
+                        .collect()
+                })
+                .ok()
+        })
+        .clone();
+    let Some(main_commits) = main_commits else {
         return Ok(None);
     };
-    let aggregate = patch_ids(&in_repo(
+    comparisons.read_paths(common, &main_commits)?;
+    let mut aggregate_paths: Vec<_> = in_repo_bounded(
         common,
         &[
             "diff",
-            "--binary",
+            "--name-only",
+            "-z",
             "--no-renames",
             "--no-ext-diff",
             "--no-textconv",
             "--no-relative",
-            "--no-color",
             "--ignore-submodules=none",
             "--submodule=short",
-            "--unified=0",
             &base,
             tip,
             "--",
         ],
-    )?)?;
-    if let Some(commit) = aggregate.keys().find_map(|patch| main_patches.get(patch)) {
+    )?
+    .split(|byte| *byte == 0)
+    .filter(|path| !path.is_empty())
+    .map(<[u8]>::to_vec)
+    .collect();
+    aggregate_paths.sort();
+    aggregate_paths.dedup();
+    let aggregate = if comparisons.has_candidate(&main_commits, &aggregate_paths) {
+        patch_ids(&in_repo_bounded(
+            common,
+            &[
+                "diff",
+                "--binary",
+                "--no-renames",
+                "--no-ext-diff",
+                "--no-textconv",
+                "--no-relative",
+                "--no-color",
+                "--ignore-submodules=none",
+                "--submodule=short",
+                "--unified=0",
+                &base,
+                tip,
+                "--",
+            ],
+        )?)?
+    } else {
+        HashMap::new()
+    };
+    if let Some(commit) = aggregate.keys().find_map(|patch| {
+        comparisons.matching_commit(common, &main_commits, &aggregate_paths, patch)
+    }) {
         return Ok(Some(BranchIntegration {
             target: target.name.clone(),
             kind: "patch".into(),
-            commit: Some(commit.clone()),
+            commit: Some(commit),
         }));
     }
     // Rebase/cherry-pick integration requires every branch-only commit to match.
@@ -1119,13 +1316,31 @@ fn equivalent_integration(
     if branch_commits.is_empty() || branch_commits.iter().any(|commit| commit.len() != 2) {
         return Ok(None);
     }
-    let branch_patches = range_patches(common, &branch_range)?;
-    if branch_patches.len() != branch_commits.len()
-        || !branch_patches
-            .keys()
-            .all(|patch| main_patches.contains_key(patch))
+    let branch_oids: Vec<_> = branch_commits
+        .iter()
+        .map(|commit| commit[0].clone())
+        .collect();
+    comparisons.read_paths(common, &branch_oids)?;
+    if branch_oids
+        .iter()
+        .any(|oid| !comparisons.has_candidate(&main_commits, &comparisons.paths[oid]))
     {
         return Ok(None);
+    }
+    let branch_patches = range_patches(common, &branch_range)?;
+    if branch_patches.len() != branch_commits.len() {
+        return Ok(None);
+    }
+    for (patch, oid) in &branch_patches {
+        let Some(paths) = comparisons.paths.get(oid).cloned() else {
+            return Ok(None);
+        };
+        if comparisons
+            .matching_commit(common, &main_commits, &paths, patch)
+            .is_none()
+        {
+            return Ok(None);
+        }
     }
     Ok(Some(BranchIntegration {
         target: target.name.clone(),

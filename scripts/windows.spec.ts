@@ -9,14 +9,20 @@ test("opening another repository or the current worktree preserves this window's
   await page.addInitScript((snapshot) => {
     const callbacks = new Map<number, (event: unknown) => void>();
     let callbackId = 0;
+    let finishScan!: () => void;
+    const scan = new Promise<void>((resolve) => {
+      finishScan = resolve;
+    });
     const current = window as unknown as {
       isTauri: boolean;
       __TAURI_INTERNALS__: unknown;
       __TAURI_EVENT_PLUGIN_INTERNALS__: unknown;
       repositoryRequests: string[];
+      finishScan: () => void;
       emitRepositoryOpen: (path: string) => void;
     };
     current.isTauri = true;
+    current.finishScan = finishScan;
     current.repositoryRequests = [];
     localStorage.setItem("gitler.repository", "/saved-other/.git");
     current.__TAURI_INTERNALS__ = {
@@ -44,13 +50,22 @@ test("opening another repository or the current worktree preserves this window's
           return path === "/other" ? null : "/current/.git";
         }
         if (command === "fetch_remotes") return null;
-        if (command === "repository_snapshot") return snapshot;
+        if (command === "repository_snapshot") {
+          await scan;
+          return snapshot;
+        }
         throw new Error(`Unexpected IPC command: ${command}`);
       },
     };
     current.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => undefined };
   }, demoSnapshot());
   await page.goto("/");
+  await expect(page.getByRole("status")).toHaveText("Scanning repository and working copies…");
+  await expect(
+    page.getByRole("heading", { name: "Every branch. Nothing left behind." }),
+  ).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath("initial-scan.png") });
+  await page.evaluate(() => (window as unknown as { finishScan: () => void }).finishScan());
   const selected = page.getByRole("button", {
     name: "Handle renamed files in status parser",
     exact: true,

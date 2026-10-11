@@ -110,6 +110,50 @@ fn recognizes_rebased_commits_but_not_a_partly_integrated_branch() {
 }
 
 #[test]
+fn recognizes_small_squashes_past_unrelated_oversized_main_patches() {
+    let repo = repo();
+    git(repo.path(), &["checkout", "-b", "feature"]);
+    commit(repo.path(), "feature.txt", "feature\n");
+    git(repo.path(), &["checkout", "main"]);
+    // The full mainline diff exceeds the comparison output limit.
+    commit(
+        repo.path(),
+        "database.json",
+        &"large record\n".repeat(1_500_000),
+    );
+    git(repo.path(), &["merge", "--squash", "feature"]);
+    git(repo.path(), &["commit", "-m", "Small squash"]);
+    let squashed = git(repo.path(), &["rev-parse", "HEAD"]);
+    let status = integration(repo.path(), "feature").unwrap();
+    assert_eq!(status.commit.as_deref(), Some(squashed.as_str()));
+}
+
+#[test]
+fn does_not_match_a_subset_of_a_main_commit() {
+    let repo = repo();
+    git(repo.path(), &["checkout", "-b", "feature"]);
+    commit(repo.path(), "feature.txt", "feature\n");
+    git(repo.path(), &["checkout", "main"]);
+    fs::write(repo.path().join("feature.txt"), "feature\n").unwrap();
+    commit(repo.path(), "extra.txt", "additional main changes\n");
+    assert!(integration(repo.path(), "feature").is_none());
+}
+
+#[test]
+fn recognizes_rebased_commits_with_reverted_paths_and_literal_unusual_names() {
+    let repo = repo();
+    git(repo.path(), &["checkout", "-b", "feature"]);
+    let transient = ":(glob)*\ntransient.txt";
+    let first = commit(repo.path(), transient, "temporary\n");
+    fs::remove_file(repo.path().join(transient)).unwrap();
+    let second = commit(repo.path(), "kept.txt", "permanent\n");
+    git(repo.path(), &["checkout", "main"]);
+    commit(repo.path(), "unrelated.txt", "force new commit IDs\n");
+    git(repo.path(), &["cherry-pick", &first, &second]);
+    assert_eq!(integration(repo.path(), "feature").unwrap().kind, "patch");
+}
+
+#[test]
 fn recognizes_ancestry_and_ignores_main_tags_empty_patches_and_unrelated_roots() {
     let repo = repo();
     git(repo.path(), &["branch", "merged"]);
