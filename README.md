@@ -15,6 +15,7 @@ TypeScript, and shadcn/ui. Currently supported only on macOS with Apple Silicon.
 - Compares two commits or a commit and a worktree's current files: select one node,
   right-click another, and choose **Diff with selected**. The diff opens on the right.
 - Renames local branches manually or suggests names with your installed Codex CLI for review.
+- Creates empty T3 Code threads for local branches, reusing their worktree or creating one.
 - Discards selected staged, unstaged, and untracked files in a chosen working copy after confirmation.
 - Fetches remote branches in the background and shows new commits without changing local work.
 - Opens GitHub and other supported remote repositories in your default browser.
@@ -55,8 +56,20 @@ Deletion requires confirmation and a merge into the local default branch. Main b
 and the main worktree are protected; worktrees with changed, untracked, or ignored files
 must be cleaned first. Locked or unavailable worktrees cannot be deleted.
 
-Git mutations beyond remote updates, renaming, selected-file discards, and merged-branch
-deletion remain outside the application's scope.
+Right-click a local branch and choose **New T3 Code thread…**, review the worktree,
+then choose **Create thread**. T3 Code must already be running with this repository
+added as a project. Gitler supports its local orchestration protocol 1 (including
+v0.0.45), using T3 Code's configured model and permissions. The integration
+uses the matching T3 component for temporary authentication; no additional CLI
+installation is needed. An unavailable connection offers a link to
+[T3 Code installation instructions](https://github.com/pingdotgg/t3code#installation).
+
+An existing registered worktree is reused with its working changes. Otherwise,
+Gitler creates a worktree for the same local branch under T3 Code's data folder
+without changing existing branches or working copies. The new worktree stays if
+thread creation fails; check T3 Code before retrying because the request may have
+succeeded. After creation, Gitler shows the thread reference and opens T3 Code;
+select the new branch-named thread there.
 
 Remote branches update when you open a repository and every minute afterward. Use
 **Refresh** to update them immediately. The status bar shows the last successful

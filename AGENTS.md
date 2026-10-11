@@ -4,8 +4,12 @@ Git operations live in `src-tauri/src/git.rs`. Resolve repositories by their com
 Git directory, including every registered worktree. Snapshot inspection stays read-only. Background fetches may update only remote-tracking
 branches; preserve local branches, tags, indexes, and working files regardless of
 configured fetch refspecs. Other mutations are limited to explicit local branch
-renames, confirmed selected-file discards, and confirmed deletion of merged local
+renames, explicit worktree creation for a T3 Code thread on an existing local branch, confirmed
+selected-file discards, and confirmed deletion of merged local
 branches with clean linked worktrees. Preserve main branches and the main worktree.
+Thread creation reuses registered worktrees; create one only when the selected
+branch has none, preserving existing branches, indexes, and working files. Keep
+created worktrees if the T3 Code request fails.
 Validate repository ownership, merge safety, and stale previews before changing files.
 
 # Learning more about Effect

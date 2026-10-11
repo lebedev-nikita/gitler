@@ -1,5 +1,5 @@
 //! Development-only JSON-lines transport. Git operations stay in `git`.
-use crate::{codex, git};
+use crate::{codex, git, threads};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::io::{self, BufRead, Write};
@@ -21,6 +21,19 @@ struct Request {
     deny_unknown_fields
 )]
 enum Command {
+    PrepareT3Thread {
+        common_dir: String,
+        branch: String,
+    },
+    StartT3Thread {
+        common_dir: String,
+        branch: String,
+        expected_head: String,
+        expected_worktree: Option<String>,
+    },
+    OpenT3Instructions {
+        common_dir: String,
+    },
     OpenRepository {
         path: String,
     },
@@ -99,6 +112,24 @@ fn value(result: Result<impl serde::Serialize, String>) -> Result<Value, String>
 
 fn dispatch(command: Command, jobs: &codex::Jobs) -> Result<Value, String> {
     match command {
+        Command::PrepareT3Thread { common_dir, branch } => {
+            value(threads::prepare(&common_dir, &branch))
+        }
+        Command::StartT3Thread {
+            common_dir,
+            branch,
+            expected_head,
+            expected_worktree,
+        } => value(threads::start(
+            &common_dir,
+            &branch,
+            &expected_head,
+            expected_worktree.as_deref(),
+        )),
+        Command::OpenT3Instructions { common_dir } => {
+            git::resolve_common(&common_dir)?;
+            value(threads::open_instructions())
+        }
         Command::OpenRepository { path } => {
             git::resolve_common(&path)?;
             let path = std::fs::canonicalize(path).map_err(|error| error.to_string())?;

@@ -1594,6 +1594,106 @@ fn registered_worktree(common: &Path, worktree: &str) -> Result<Worktree, String
     Ok(tree)
 }
 
+pub(crate) struct ThreadTarget {
+    pub project_path: PathBuf,
+    pub head: String,
+    pub worktree: Option<PathBuf>,
+}
+
+/// Resolve the local T3 project without checking out or changing any branch.
+pub(crate) fn thread_target(common_dir: &str, branch: &str) -> Result<ThreadTarget, String> {
+    let common = validate_common(common_dir)?;
+    let head = branch_head(&common, branch)?;
+    let trees = parse_worktrees(&in_repo(
+        &common,
+        &["worktree", "list", "--porcelain", "-z"],
+    )?);
+    let tree = trees.first().ok_or("Repository has no main worktree")?;
+    registered_worktree(&common, &tree.path)?;
+    let root = std::fs::canonicalize(&tree.path).map_err(|error| error.to_string())?;
+    let worktree = trees
+        .iter()
+        .find(|tree| tree.branch.as_deref() == Some(branch));
+    let worktree = worktree
+        .map(|tree| {
+            let registered = registered_worktree(&common, &tree.path)?;
+            if registered.locked.is_some() || registered.prunable.is_some() {
+                return Err("The selected branch’s worktree is locked or unavailable.".into());
+            }
+            if registered.head != head {
+                return Err(
+                    "The selected branch’s worktree changed. Refresh and try again.".into(),
+                );
+            }
+            std::fs::canonicalize(&registered.path).map_err(|error| error.to_string())
+        })
+        .transpose()?;
+    Ok(ThreadTarget {
+        project_path: root,
+        head,
+        worktree,
+    })
+}
+
+/// Explicit thread creation may add a worktree for an unchecked-out local branch.
+/// Never switch an existing worktree, create a branch, or delete files on failure.
+pub(crate) fn thread_worktree(
+    common_dir: &str,
+    branch: &str,
+    expected_head: &str,
+    expected_worktree: Option<&str>,
+    directory: &Path,
+) -> Result<PathBuf, String> {
+    let _lock = MUTATIONS
+        .lock()
+        .map_err(|_| "Repository mutation lock unavailable")?;
+    let target = thread_target(common_dir, branch)?;
+    if target.head != expected_head
+        || target
+            .worktree
+            .as_ref()
+            .map(|path| path.to_string_lossy())
+            .as_deref()
+            != expected_worktree
+    {
+        return Err(
+            "The selected branch or its worktree changed. Reopen the thread dialog.".into(),
+        );
+    }
+    if let Some(path) = target.worktree {
+        return Ok(path);
+    }
+    let common = validate_common(common_dir)?;
+    std::fs::create_dir_all(directory).map_err(|error| error.to_string())?;
+    let holder = tempfile::Builder::new()
+        .prefix("thread-")
+        .tempdir_in(directory)
+        .map_err(|error| error.to_string())?;
+    let path = holder.path().join("worktree");
+    let path_string = path.to_str().ok_or("Worktree path is not valid UTF-8")?;
+    // Keep the holder even on failure: Git or a hook may have written files here.
+    let _ = holder.keep();
+    in_repo(
+        &common,
+        &[
+            "-c",
+            "core.hooksPath=/dev/null",
+            "-c",
+            "submodule.recurse=false",
+            "worktree",
+            "add",
+            "--",
+            path_string,
+            branch,
+        ],
+    )?;
+    let registered = registered_worktree(&common, path_string)?;
+    if registered.branch.as_deref() != Some(branch) || registered.head != expected_head {
+        return Err(format!("The branch changed while its worktree was created at {path_string}. Inspect it before retrying."));
+    }
+    std::fs::canonicalize(path).map_err(|error| error.to_string())
+}
+
 pub fn branch_context(
     common_dir: &str,
     branch: &str,
@@ -2122,4 +2222,137 @@ pub fn discard_changes(
         })?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod thread_tests {
+    use super::*;
+
+    fn git(path: &Path, args: &[&str]) -> String {
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(path)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8_lossy(&output.stdout).trim().to_string()
+    }
+
+    fn fixture() -> tempfile::TempDir {
+        let holder = tempfile::tempdir().unwrap();
+        git(holder.path(), &["init", "-b", "main"]);
+        git(holder.path(), &["config", "user.email", "test@example.com"]);
+        git(holder.path(), &["config", "user.name", "Test"]);
+        std::fs::write(holder.path().join("file"), "initial").unwrap();
+        git(holder.path(), &["add", "file"]);
+        git(holder.path(), &["commit", "-m", "initial"]);
+        git(holder.path(), &["branch", "feature/selected"]);
+        holder
+    }
+
+    #[test]
+    fn creates_selected_branch_worktree_and_reuses_it_without_touching_main() {
+        let repo = fixture();
+        let common = resolve_common(repo.path().to_str().unwrap()).unwrap();
+        let common = common.to_str().unwrap();
+        std::fs::write(repo.path().join("file"), "staged").unwrap();
+        git(repo.path(), &["add", "file"]);
+        std::fs::write(repo.path().join("file"), "working").unwrap();
+        std::fs::write(repo.path().join("untracked"), "keep").unwrap();
+        let before_index = std::fs::read(repo.path().join(".git/index")).unwrap();
+        let before_refs = git(repo.path(), &["show-ref"]);
+        let target = thread_target(common, "feature/selected").unwrap();
+        assert!(target.worktree.is_none());
+        let directory = repo.path().join("new-worktrees");
+        let linked =
+            thread_worktree(common, "feature/selected", &target.head, None, &directory).unwrap();
+        assert_eq!(
+            git(&linked, &["branch", "--show-current"]),
+            "feature/selected"
+        );
+        assert_eq!(
+            std::fs::read_to_string(linked.join("file")).unwrap(),
+            "initial"
+        );
+        std::fs::write(linked.join("file"), "linked edits").unwrap();
+        let reused = thread_worktree(
+            common,
+            "feature/selected",
+            &target.head,
+            linked.to_str(),
+            &directory,
+        )
+        .unwrap();
+        assert_eq!(reused, linked);
+        assert_eq!(
+            std::fs::read_to_string(linked.join("file")).unwrap(),
+            "linked edits"
+        );
+        assert_eq!(
+            std::fs::read(repo.path().join(".git/index")).unwrap(),
+            before_index
+        );
+        assert_eq!(git(repo.path(), &["show-ref"]), before_refs);
+        assert_eq!(git(repo.path(), &["branch", "--show-current"]), "main");
+        assert_eq!(
+            std::fs::read_to_string(repo.path().join("file")).unwrap(),
+            "working"
+        );
+        assert_eq!(
+            std::fs::read_to_string(repo.path().join("untracked")).unwrap(),
+            "keep"
+        );
+        let main = thread_target(common, "main").unwrap();
+        assert_eq!(
+            thread_worktree(
+                common,
+                "main",
+                &main.head,
+                main.worktree.as_ref().unwrap().to_str(),
+                &directory
+            )
+            .unwrap(),
+            std::fs::canonicalize(repo.path()).unwrap()
+        );
+    }
+
+    #[test]
+    fn rejects_stale_head_and_newly_registered_worktree_before_creating_directories() {
+        let repo = fixture();
+        let common = resolve_common(repo.path().to_str().unwrap()).unwrap();
+        let common = common.to_str().unwrap();
+        let target = thread_target(common, "feature/selected").unwrap();
+        let directory = repo.path().join("should-not-exist");
+        assert!(thread_worktree(
+            common,
+            "feature/selected",
+            &"0".repeat(40),
+            None,
+            &directory
+        )
+        .is_err());
+        assert!(!directory.exists());
+        let linked = repo.path().join("linked");
+        git(
+            repo.path(),
+            &[
+                "worktree",
+                "add",
+                linked.to_str().unwrap(),
+                "feature/selected",
+            ],
+        );
+        assert!(
+            thread_worktree(common, "feature/selected", &target.head, None, &directory).is_err()
+        );
+        assert!(!directory.exists());
+        git(repo.path(), &["worktree", "lock", linked.to_str().unwrap()]);
+        assert!(thread_target(common, "feature/selected").is_err());
+        assert!(thread_target(common, "origin/main").is_err());
+    }
 }
