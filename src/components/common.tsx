@@ -17,11 +17,13 @@ export function CopyButton({
   label = "Copy",
   title = label,
   size = "icon-xs",
+  icon: Icon = Copy,
 }: {
   value: string;
   label?: string;
   title?: string;
   size?: "icon-xs" | "icon-sm";
+  icon?: LucideIcon;
 }) {
   const [copied, setCopied] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -42,7 +44,7 @@ export function CopyButton({
           }
         }}
       >
-        {copied ? <Check /> : <Copy />}
+        {copied ? <Check /> : <Icon />}
       </Button>
     </AppTooltip>
   );
