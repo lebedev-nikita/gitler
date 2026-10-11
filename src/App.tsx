@@ -3,9 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
-  Archive,
   ChevronRight,
-  Database,
   FolderOpen,
   ExternalLink,
   CloudDownload,
@@ -19,7 +17,7 @@ import {
   RefreshCw,
   Terminal,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -38,7 +36,8 @@ import { Inspector } from "@/components/Inspector";
 import type { InspectorView } from "@/components/Inspector";
 import { ResizableSplit } from "@/components/ResizableSplit";
 import { useNarrowLayout, useStoredBoolean } from "@/hooks/use-layout";
-import { CopyButton, ErrorMessage, Loading, shortHash, shortPath } from "@/components/common";
+import { CopyButton, ErrorMessage, Loading, shortPath } from "@/components/common";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DEMO_PATH } from "@/lib/demo";
 import { desktop, localRepository, isDemo, repositoryApi } from "@/lib/repository";
 import { selectionId } from "@/lib/models";
@@ -69,13 +68,7 @@ export default function App() {
   const narrow = useNarrowLayout();
   const [openDialog, setOpenDialog] = useState(false);
   const [graphAction, setGraphAction] = useState<GraphAction | null>(null);
-  const [infoDialog, setInfoDialog] = useState(false);
-  const [infoSection, setInfoSection] = useState<"repository" | "remotes">("repository");
-  const showInfo = (section: "repository" | "remotes" = "repository") => {
-    setInfoSection(section);
-    setInfoDialog(true);
-  };
-  const remotesHeading = useRef<HTMLHeadingElement>(null);
+  const [remotesDialog, setRemotesDialog] = useState(false);
   const [shortcutsDialog, setShortcutsDialog] = useState(false);
   const [inputPath, setInputPath] = useState("");
   const [opening, setOpening] = useState(false);
@@ -119,9 +112,20 @@ export default function App() {
     staleTime: 60000,
   });
   const [remoteOpenError, setRemoteOpenError] = useState<unknown>(null);
+  const githubRemotes = snapshot?.remotes.filter(
+    (remote) => remote.webUrl && new URL(remote.webUrl).hostname === "github.com",
+  );
   const primaryRemote =
+    githubRemotes?.find((remote) => remote.name === "origin") ??
+    githubRemotes?.[0] ??
     snapshot?.remotes.find((remote) => remote.name === "origin" && remote.webUrl) ??
-    snapshot?.remotes.find((remote) => remote.webUrl);
+    snapshot?.remotes.find((remote) => remote.webUrl) ??
+    snapshot?.remotes.find((remote) => remote.name === "origin") ??
+    snapshot?.remotes[0];
+  const remoteLabel =
+    primaryRemote?.webUrl && new URL(primaryRemote.webUrl).hostname === "github.com"
+      ? "GitHub"
+      : "Remote";
   const openRemote = async (name: string) => {
     if (!snapshot) return;
     setRemoteOpenError(null);
@@ -129,7 +133,7 @@ export default function App() {
       await repositoryApi.openRemote(snapshot.commonDir, name);
     } catch (error) {
       setRemoteOpenError(error);
-      showInfo("remotes");
+      setRemotesDialog(true);
     }
   };
   const refreshBusy = repository.isLoading || refreshing;
@@ -278,11 +282,11 @@ export default function App() {
         event.preventDefault();
         if (!event.repeat) setInspectorOpen((value) => !value);
       }
-      if (!editing && event.key === "?" && !openDialog && !infoDialog) setShortcutsDialog(true);
+      if (!editing && event.key === "?" && !openDialog && !remotesDialog) setShortcutsDialog(true);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [refreshRepository, openDialog, infoDialog, snapshot, selected, setInspectorOpen]);
+  }, [refreshRepository, openDialog, remotesDialog, snapshot, selected, setInspectorOpen]);
 
   const compare = (other: Selection) => {
     if (
@@ -303,55 +307,75 @@ export default function App() {
         <img src={appIcon} alt="" width={28} height={28} className="size-[28px] flex-none" />
         <strong className="text-[16px] font-[650] tracking-[-0.025em]">Gitler</strong>
         <span className="h-[17px] w-[1px] my-0 mx-[3px] bg-border" />
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => snapshot && showInfo()}
-          disabled={!snapshot}
-        >
-          <GitBranch data-icon="inline-start" />
-          {snapshot?.name ?? "No repository"}
-          <ChevronRight data-icon="inline-end" />
-        </Button>
-        {primaryRemote && (
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label={`Open ${primaryRemote.name} repository in browser`}
-            title={
-              demo
-                ? "Demo remote — open a local repository to use this action"
-                : primaryRemote.webUrl!
-            }
-            disabled={demo}
-            onClick={() => {
-              void openRemote(primaryRemote.name);
-            }}
-          >
-            <ExternalLink data-icon="inline-start" />
-            <span className="compact:hidden">
-              {new URL(primaryRemote.webUrl!).host === "github.com" ? "GitHub" : "Remote"}
+        <div className="flex items-center gap-[3px] min-w-0">
+          {primaryRemote?.webUrl ? (
+            <a
+              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "min-w-0 shrink")}
+              href={primaryRemote.webUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Open ${snapshot!.name} on ${remoteLabel}`}
+              aria-disabled={demo || undefined}
+              title={
+                demo
+                  ? "Demo remote — open a local repository to use this action"
+                  : primaryRemote.webUrl
+              }
+              onClick={(event) => {
+                event.preventDefault();
+                if (!demo) void openRemote(primaryRemote.name);
+              }}
+            >
+              <GitBranch data-icon="inline-start" />
+              <span className="truncate">{snapshot!.name}</span>
+              <span className="compact:hidden">{remoteLabel}</span>
+              <ExternalLink data-icon="inline-end" />
+            </a>
+          ) : (
+            <span className="flex items-center gap-[5px] min-w-0 text-[12px]">
+              <GitBranch className="size-[13px] flex-none" />
+              <span className="truncate">{snapshot?.name ?? "No repository"}</span>
             </span>
-          </Button>
-        )}
+          )}
+          {primaryRemote && !primaryRemote.webUrl && (
+            <CopyButton value={primaryRemote.url} label={`Copy ${primaryRemote.name} remote URL`} />
+          )}
+          {snapshot && (
+            <CopyButton
+              key={snapshot.path}
+              value={snapshot.path}
+              label="Copy repository path"
+              title={`Copy repository path: ${snapshot.path}`}
+              size="icon-sm"
+            />
+          )}
+        </div>
         {demo && (
           <Badge className="compact:hidden" variant="outline">
             Demo
           </Badge>
         )}
         <div className="flex-1" />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            setInputPath("");
-            setOpenError(null);
-            setOpenDialog(true);
-          }}
-        >
-          <FolderOpen data-icon="inline-start" />
-          <span>Open repository</span>
-        </Button>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="outline"
+                size="icon-sm"
+                aria-label="Open repository"
+                aria-keyshortcuts="Meta+O Control+O"
+                onClick={() => {
+                  setInputPath("");
+                  setOpenError(null);
+                  setOpenDialog(true);
+                }}
+              >
+                <FolderOpen />
+              </Button>
+            }
+          />
+          <TooltipContent>Open repository (⌘ / Ctrl O)</TooltipContent>
+        </Tooltip>
         <Button
           variant="ghost"
           size="icon-sm"
@@ -576,8 +600,8 @@ export default function App() {
                 "inline-flex items-center gap-[5px] flex-none",
                 remoteSync.isError && "text-destructive",
               )}
-              onClick={() => showInfo("remotes")}
-              title="Remote updates and repository information"
+              onClick={() => setRemotesDialog(true)}
+              title="Remote updates"
             >
               <CloudDownload className="size-[12px]" />
               {remoteSync.isFetching
@@ -676,75 +700,14 @@ export default function App() {
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={infoDialog}
-        onOpenChange={setInfoDialog}
-        onOpenChangeComplete={(open) => {
-          if (open && infoSection === "remotes")
-            remotesHeading.current?.scrollIntoView({ block: "start" });
-        }}
-      >
+      <Dialog open={remotesDialog} onOpenChange={setRemotesDialog}>
         <DialogContent className="max-h-[85dvh]">
           <DialogHeader>
-            <DialogTitle>{snapshot?.name ?? "Repository"}</DialogTitle>
-            <DialogDescription>
-              Repository-wide information. Working copies are listed under their branches.
-            </DialogDescription>
+            <DialogTitle>Remotes</DialogTitle>
+            <DialogDescription>Remote repositories and background updates.</DialogDescription>
           </DialogHeader>
           {snapshot && (
             <div className="overflow-y-auto min-h-0 max-h-[60dvh] pr-[7px]">
-              <div className="flex items-center gap-[8px] text-muted-foreground">
-                <Database className="size-[15px] flex-none" />
-                <code className="min-w-0 text-[10px] wrap-anywhere">{snapshot.commonDir}</code>
-                <CopyButton value={snapshot.commonDir} label="Copy common Git directory" />
-              </div>
-              <h3 className="text-[12px] font-semibold mt-[24px] mx-0 mb-[10px]">
-                Branches & working copies
-              </h3>
-              {snapshot.worktrees.map((tree) => (
-                <div className="py-[10px] px-0 border-b border-border" key={tree.path}>
-                  <div className="flex items-center gap-[7px]">
-                    <GitBranch className="size-[13px] text-muted-foreground" />
-                    <strong className="text-[12px] min-w-0 wrap-anywhere">
-                      {tree.branch ??
-                        (tree.bare ? "Bare repository" : `Detached ${shortHash(tree.head)}`)}
-                    </strong>
-                    <Badge
-                      className="ml-auto text-[10px] leading-[1.333333]"
-                      variant={tree.error ? "destructive" : tree.files.length ? "dirty" : "quiet"}
-                    >
-                      {tree.error
-                        ? "Unavailable"
-                        : snapshot.worktreeStatusPending && !tree.bare
-                          ? repository.isError
-                            ? "Status unknown"
-                            : "Checking…"
-                          : tree.files.length
-                            ? `${tree.files.length} changes`
-                            : "Clean"}
-                    </Badge>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground font-mono mt-[6px] mr-0 mb-0 ml-[20px] wrap-anywhere">
-                    {shortPath(tree.path)}
-                  </p>
-                  {tree.error && (
-                    <p className="text-removed text-[10px] font-mono mt-[6px] mr-0 mb-0 ml-[20px] wrap-anywhere">
-                      {tree.error}
-                    </p>
-                  )}
-                  {tree.locked !== null && (
-                    <p className="text-[10px] text-muted-foreground font-mono mt-[6px] mr-0 mb-0 ml-[20px] wrap-anywhere">
-                      Locked{tree.locked && `: ${tree.locked}`}
-                    </p>
-                  )}
-                </div>
-              ))}
-              <h3
-                ref={remotesHeading}
-                className="text-[12px] font-semibold mt-[24px] mx-0 mb-[10px]"
-              >
-                Remotes
-              </h3>
               {!!remoteOpenError && (
                 <ErrorMessage title="Could not open remote" error={remoteOpenError} />
               )}
@@ -794,28 +757,6 @@ export default function App() {
                 ))
               ) : (
                 <p className="text-muted-foreground text-[12px]">No remotes configured.</p>
-              )}
-              <h3 className="text-[12px] font-semibold mt-[24px] mx-0 mb-[10px]">Stashes</h3>
-              {snapshot.stashes.length ? (
-                snapshot.stashes.map((stash) => (
-                  <button
-                    className="flex gap-[10px] items-center text-left w-full py-[10px] px-0"
-                    key={stash.selector}
-                    onClick={() => {
-                      select({ kind: "commit", oid: stash.oid });
-                      setInfoDialog(false);
-                    }}
-                  >
-                    <Archive className="size-[14px] flex-none text-muted-foreground" />
-                    <div className="flex-1 flex flex-col gap-[4px] text-[12px]">
-                      <strong>{stash.selector}</strong>
-                      <span className="text-muted-foreground text-[11px]">{stash.subject}</span>
-                    </div>
-                    <ChevronRight className="size-[14px] flex-none text-muted-foreground" />
-                  </button>
-                ))
-              ) : (
-                <p className="text-muted-foreground text-[12px]">No stashes.</p>
               )}
             </div>
           )}

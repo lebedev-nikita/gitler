@@ -11,7 +11,6 @@ TypeScript, and shadcn/ui. Currently supported only on macOS with Apple Silicon.
 
 - Shows uncommitted changes as amber graph nodes attached to each worktree's HEAD.
 - Opens the commit graph first, then checks working copies in the background.
-- Surfaces detached, locked, and unavailable working copies in repository metadata.
 - Inspects staged, unstaged, and untracked files without switching branches.
 - Compares two commits or a commit and a worktree's current files: select one node,
   right-click another, and choose **Diff with selected**. The diff opens on the right.
@@ -64,9 +63,12 @@ Remote branches update when you open a repository and every minute afterward. Us
 update or a failure; click it to inspect remote addresses and retry. Gitler uses
 your existing Git credentials. For private repositories, authenticate with Git
 outside the app first. Offline use keeps the last fetched history available.
-The toolbar opens `origin` (or another remote with a supported web address);
-repository information offers an opening action for each remote. Local-path
-remotes and SSH aliases without a web hostname have no browser link.
+Click the repository name in the toolbar to open GitHub or another supported
+remote. Right-click the link to copy its address using the native context menu.
+The adjacent copy button copies the base repository folder path, even when you
+open a linked worktree. Click the remote-update status in the footer to inspect
+and open other remotes. Local-path remotes and SSH aliases without a web hostname
+have no browser link.
 
 ## Download
 
