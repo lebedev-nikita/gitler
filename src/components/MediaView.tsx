@@ -1,3 +1,4 @@
+import { AppTooltip } from "@/components/AppTooltip";
 import { useState } from "react";
 import { Image, Music2, Video } from "lucide-react";
 import type { MediaResult, MediaVersion } from "@/lib/models";
@@ -103,9 +104,9 @@ export function MediaView({ media, file }: { media: MediaResult; file: string })
     <div className="flex-1 min-h-0 min-w-0 flex flex-col">
       <div className="flex gap-[8px] items-center px-[15px] h-[39px] flex-none bg-secondary">
         <Icon className="size-[14px] text-muted-foreground flex-none" />
-        <span className="flex-1 truncate font-mono text-[10px]" title={file}>
-          {file}
-        </span>
+        <AppTooltip content={file}>
+          <span className="flex-1 truncate font-mono text-[10px]">{file}</span>
+        </AppTooltip>
         <span className="text-muted-foreground text-[10px]">Preview</span>
       </div>
       <div

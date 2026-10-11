@@ -1,3 +1,4 @@
+import { AppTooltip } from "@/components/AppTooltip";
 import { useMemo } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
@@ -215,9 +216,9 @@ export function Inspector({
               </Badge>
             </div>
             <div className="flex gap-[6px] items-center text-muted-foreground font-mono text-[10px]">
-              <span className="min-w-0 truncate" title={tree.path}>
-                {shortPath(tree.path)}
-              </span>
+              <AppTooltip content={tree.path}>
+                <span className="min-w-0 truncate">{shortPath(tree.path)}</span>
+              </AppTooltip>
               <CopyButton value={tree.path} label="Copy working copy path" />
             </div>
             {tree.locked !== null && (
@@ -333,16 +334,17 @@ export function Inspector({
             <strong className="text-foreground font-medium">Changed files</strong>
             <span>{files.length}</span>
             <span className="ml-auto">Status</span>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              aria-label={previewOpen ? "Hide diff preview" : "Show diff preview"}
-              title={previewOpen ? "Hide diff preview" : "Show diff preview"}
-              aria-expanded={previewOpen}
-              onClick={togglePreview}
-            >
-              {previewOpen ? <PanelBottomClose /> : <PanelBottomOpen />}
-            </Button>
+            <AppTooltip content={previewOpen ? "Hide diff preview" : "Show diff preview"}>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label={previewOpen ? "Hide diff preview" : "Show diff preview"}
+                aria-expanded={previewOpen}
+                onClick={togglePreview}
+              >
+                {previewOpen ? <PanelBottomClose /> : <PanelBottomOpen />}
+              </Button>
+            </AppTooltip>
           </div>
           <ResizableSplit
             id={narrow ? "inspector-stacked" : "inspector-horizontal"}
@@ -360,35 +362,38 @@ export function Inspector({
                 {files.map((file: FileChange) => {
                   const status = fileStatus(file);
                   return (
-                    <button
+                    <AppTooltip
+                      content={`${file.oldPath ? `${file.oldPath} → ` : ""}${file.path} · ${statusLabels[status] ?? status}`}
                       key={file.path}
-                      className={cn(
-                        "w-full flex items-center gap-[9px] py-0 px-[8px] h-[33px] text-left rounded-[4px] font-mono text-[11px] bg-transparent hover:bg-file-hover",
-                        file.path === selectedFile?.path &&
-                          "bg-file-selected hover:bg-file-selected",
-                      )}
-                      aria-pressed={file.path === selectedFile?.path}
-                      onClick={() => changeView({ filePath: file.path })}
-                      title={`${file.oldPath ? `${file.oldPath} → ` : ""}${file.path} · ${statusLabels[status] ?? status}`}
                     >
-                      <span
+                      <button
                         className={cn(
-                          "text-dirty text-[10px] font-bold flex-none w-[12px]",
-                          status === "?" && "text-tag",
-                          status === "D" && "text-removed",
-                          status === "U" && "text-removed",
+                          "w-full flex items-center gap-[9px] py-0 px-[8px] h-[33px] text-left rounded-[4px] font-mono text-[11px] bg-transparent hover:bg-file-hover",
+                          file.path === selectedFile?.path &&
+                            "bg-file-selected hover:bg-file-selected",
                         )}
+                        aria-pressed={file.path === selectedFile?.path}
+                        onClick={() => changeView({ filePath: file.path })}
                       >
-                        {status}
-                      </span>
-                      <span className="flex-1 truncate">{file.path}</span>
-                      {file.additions !== null && (
-                        <span className="text-added">+{file.additions}</span>
-                      )}
-                      {file.deletions !== null && (
-                        <span className="text-removed">−{file.deletions}</span>
-                      )}
-                    </button>
+                        <span
+                          className={cn(
+                            "text-dirty text-[10px] font-bold flex-none w-[12px]",
+                            status === "?" && "text-tag",
+                            status === "D" && "text-removed",
+                            status === "U" && "text-removed",
+                          )}
+                        >
+                          {status}
+                        </span>
+                        <span className="flex-1 truncate">{file.path}</span>
+                        {file.additions !== null && (
+                          <span className="text-added">+{file.additions}</span>
+                        )}
+                        {file.deletions !== null && (
+                          <span className="text-removed">−{file.deletions}</span>
+                        )}
+                      </button>
+                    </AppTooltip>
                   );
                 })}
               </div>

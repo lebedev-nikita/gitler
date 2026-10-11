@@ -27,7 +27,7 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { AppTooltip } from "@/components/AppTooltip";
 import { isDemo, repositoryApi } from "@/lib/repository";
 import type { DeleteBranchPlan, DiscardPlan, GraphAction, Snapshot } from "@/lib/models";
 import { shortPath } from "./common";
@@ -238,9 +238,11 @@ export function GraphActions({
         <div className="flex flex-col gap-[4px] min-w-0 wrap-anywhere">
           <strong>{label}</strong>
           {action.worktree && action.kind !== "delete" && (
-            <span className="text-muted-foreground text-[11px]" title={action.worktree}>
-              {shortPath(action.worktree)}
-            </span>
+            <AppTooltip content={action.worktree}>
+              <span className="text-muted-foreground text-[11px]">
+                {shortPath(action.worktree)}
+              </span>
+            </AppTooltip>
           )}
         </div>
         {demo && (
@@ -297,21 +299,16 @@ export function GraphActions({
                   onFocus={(event) => event.target.select()}
                 />
                 <InputGroupAddon align="inline-end">
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <InputGroupButton
-                          size="icon-sm"
-                          aria-label="Generate with AI"
-                          disabled={demo || loading || busy}
-                          onClick={() => void generate()}
-                        >
-                          {loading ? <LoaderCircle className="animate-spin" /> : <Sparkles />}
-                        </InputGroupButton>
-                      }
-                    />
-                    <TooltipContent>Generate with AI</TooltipContent>
-                  </Tooltip>
+                  <AppTooltip content="Generate with AI">
+                    <InputGroupButton
+                      size="icon-sm"
+                      aria-label="Generate with AI"
+                      disabled={demo || loading || busy}
+                      onClick={() => void generate()}
+                    >
+                      {loading ? <LoaderCircle className="animate-spin" /> : <Sparkles />}
+                    </InputGroupButton>
+                  </AppTooltip>
                 </InputGroupAddon>
               </InputGroup>
               <FieldDescription>

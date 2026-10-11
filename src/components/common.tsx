@@ -1,3 +1,4 @@
+import { AppTooltip } from "@/components/AppTooltip";
 import { useState } from "react";
 import { Check, Copy, AlertTriangle, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,24 +26,25 @@ export function CopyButton({
   const [copied, setCopied] = useState(false);
   const [failed, setFailed] = useState(false);
   return (
-    <Button
-      size={size}
-      variant="ghost"
-      aria-label={copied ? "Copied" : label}
-      title={failed ? "Clipboard unavailable" : copied ? "Copied" : title}
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(value);
-          setCopied(true);
-          setFailed(false);
-          setTimeout(() => setCopied(false), 1800);
-        } catch {
-          setFailed(true);
-        }
-      }}
-    >
-      {copied ? <Check /> : <Copy />}
-    </Button>
+    <AppTooltip content={failed ? "Clipboard unavailable" : copied ? "Copied" : title}>
+      <Button
+        size={size}
+        variant="ghost"
+        aria-label={copied ? "Copied" : label}
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(value);
+            setCopied(true);
+            setFailed(false);
+            setTimeout(() => setCopied(false), 1800);
+          } catch {
+            setFailed(true);
+          }
+        }}
+      >
+        {copied ? <Check /> : <Copy />}
+      </Button>
+    </AppTooltip>
   );
 }
 
