@@ -27,6 +27,7 @@ enum Command {
     RepositorySnapshot {
         path: String,
         limit: usize,
+        include_worktree_status: Option<bool>,
     },
     FetchRemotes {
         common_dir: String,
@@ -103,7 +104,15 @@ fn dispatch(command: Command, jobs: &codex::Jobs) -> Result<Value, String> {
             let path = std::fs::canonicalize(path).map_err(|error| error.to_string())?;
             Ok(json!(path.to_string_lossy()))
         }
-        Command::RepositorySnapshot { path, limit } => value(git::snapshot(&path, limit)),
+        Command::RepositorySnapshot {
+            path,
+            limit,
+            include_worktree_status,
+        } => value(git::snapshot_with_status(
+            &path,
+            limit,
+            include_worktree_status.unwrap_or(true),
+        )),
         Command::FetchRemotes { common_dir } => value(git::fetch_remotes(&common_dir)),
         Command::OpenRemote { common_dir, name } => {
             let url = git::remote_url(&common_dir, &name)?;

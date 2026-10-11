@@ -75,6 +75,7 @@ export function demoSnapshot(): Snapshot {
   return {
     name: "gitler",
     commonDir: "demo",
+    worktreeStatusPending: false,
     path: "/Users/alex/Projects/gitler",
     worktrees: branches.map((branch, index) => ({
       path:

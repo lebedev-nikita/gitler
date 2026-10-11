@@ -1,9 +1,11 @@
-Gitler 0.4.1 fixes the window title bar background.
+Gitler 0.4.2 opens repository history before scanning working copies.
 
 ## Changes
 
-- Match the native title bar to the toolbar's charcoal background in every repository window.
-- Check the native background against the toolbar's CSS color during tests and production builds, preventing palette changes from leaving the title bar behind.
+- Show the commit graph immediately after reading history and branches, then load working copy statuses in the background.
+- Keep history usable if a working copy scan fails, and allow retrying with Refresh. Pending statuses are shown explicitly and block worktree deletion until checked.
+- Detect merged branches through commit ancestry. Automatic matching of squash merges and GitHub rebase-and-merge commits has been removed.
+- Show progress while opening repositories from the command line.
 
 ## Downloads
 

@@ -60,7 +60,7 @@ test("opening another repository or the current worktree preserves this window's
     current.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => undefined };
   }, demoSnapshot());
   await page.goto("/");
-  await expect(page.getByRole("status")).toHaveText("Scanning repository and working copies…");
+  await expect(page.getByRole("status")).toHaveText("Reading repository history…");
   await expect(
     page.getByRole("heading", { name: "Every branch. Nothing left behind." }),
   ).toHaveCount(0);

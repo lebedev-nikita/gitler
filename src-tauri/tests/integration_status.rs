@@ -47,7 +47,7 @@ fn integration(path: &Path, branch: &str) -> Option<git::BranchIntegration> {
 }
 
 #[test]
-fn recognizes_squashed_branch_with_multiple_commits_and_remote_alias_without_touching_worktrees() {
+fn recognizes_merged_branch_outside_the_graph_page_without_touching_worktrees() {
     let repo = repo();
     let holder = TempDir::new().unwrap();
     let tree = holder.path().join("agent");
@@ -57,9 +57,10 @@ fn recognizes_squashed_branch_with_multiple_commits_and_remote_alias_without_tou
     );
     commit(&tree, "first.txt", "first\n");
     commit(&tree, "second.txt", "second\n");
-    git(repo.path(), &["merge", "--squash", "feature"]);
-    git(repo.path(), &["commit", "-m", "Squashed feature"]);
-    let squashed = git(repo.path(), &["rev-parse", "HEAD"]);
+    git(
+        repo.path(),
+        &["merge", "--no-ff", "feature", "-m", "Merge feature"],
+    );
     git(
         repo.path(),
         &[
@@ -81,9 +82,7 @@ fn recognizes_squashed_branch_with_multiple_commits_and_remote_alias_without_tou
     let refs = git(repo.path(), &["show-ref"]);
     let expected = integration(&tree, "feature").unwrap();
     assert_eq!(expected.target, "main");
-    assert_eq!(expected.kind, "patch");
-    assert_eq!(expected.commit.as_deref(), Some(squashed.as_str()));
-    assert_eq!(integration(&tree, "origin/feature").unwrap().kind, "patch");
+    assert_eq!(integration(&tree, "origin/feature").unwrap().target, "main");
     assert_eq!(fs::read(index_path).unwrap(), index);
     assert_eq!(
         fs::read_to_string(tree.join("first.txt")).unwrap(),
@@ -96,7 +95,7 @@ fn recognizes_squashed_branch_with_multiple_commits_and_remote_alias_without_tou
 }
 
 #[test]
-fn recognizes_rebased_commits_but_not_a_partly_integrated_branch() {
+fn does_not_recognize_rewritten_commits_as_merged() {
     let repo = repo();
     git(repo.path(), &["checkout", "-b", "feature"]);
     let first = commit(repo.path(), "first.txt", "first\n");
@@ -106,26 +105,25 @@ fn recognizes_rebased_commits_but_not_a_partly_integrated_branch() {
     git(repo.path(), &["cherry-pick", &first]);
     assert!(integration(repo.path(), "feature").is_none());
     git(repo.path(), &["cherry-pick", &second]);
-    assert_eq!(integration(repo.path(), "feature").unwrap().kind, "patch");
+    assert!(integration(repo.path(), "feature").is_none());
 }
 
 #[test]
-fn recognizes_small_squashes_past_unrelated_oversized_main_patches() {
+fn does_not_recognize_squashed_changes_as_merged() {
     let repo = repo();
     git(repo.path(), &["checkout", "-b", "feature"]);
-    commit(repo.path(), "feature.txt", "feature\n");
-    git(repo.path(), &["checkout", "main"]);
-    // The full mainline diff exceeds the comparison output limit.
-    commit(
+    commit(repo.path(), "first.txt", "first\n");
+    let tip = commit(repo.path(), "second.txt", "second\n");
+    git(
         repo.path(),
-        "database.json",
-        &"large record\n".repeat(1_500_000),
+        &["update-ref", "refs/remotes/origin/feature", &tip],
     );
+    git(repo.path(), &["checkout", "main"]);
     git(repo.path(), &["merge", "--squash", "feature"]);
-    git(repo.path(), &["commit", "-m", "Small squash"]);
-    let squashed = git(repo.path(), &["rev-parse", "HEAD"]);
-    let status = integration(repo.path(), "feature").unwrap();
-    assert_eq!(status.commit.as_deref(), Some(squashed.as_str()));
+    git(repo.path(), &["commit", "-m", "Squash feature"]);
+    assert!(git(repo.path(), &["diff", "main", "feature"]).is_empty());
+    assert!(integration(repo.path(), "feature").is_none());
+    assert!(integration(repo.path(), "origin/feature").is_none());
 }
 
 #[test]
@@ -140,17 +138,36 @@ fn does_not_match_a_subset_of_a_main_commit() {
 }
 
 #[test]
-fn recognizes_rebased_commits_with_reverted_paths_and_literal_unusual_names() {
-    let repo = repo();
-    git(repo.path(), &["checkout", "-b", "feature"]);
-    let transient = ":(glob)*\ntransient.txt";
-    let first = commit(repo.path(), transient, "temporary\n");
-    fs::remove_file(repo.path().join(transient)).unwrap();
-    let second = commit(repo.path(), "kept.txt", "permanent\n");
-    git(repo.path(), &["checkout", "main"]);
-    commit(repo.path(), "unrelated.txt", "force new commit IDs\n");
-    git(repo.path(), &["cherry-pick", &first, &second]);
-    assert_eq!(integration(repo.path(), "feature").unwrap().kind, "patch");
+fn recognizes_rebased_branch_after_fast_forward_or_merge_commit() {
+    for method in ["--ff-only", "--no-ff"] {
+        let repo = repo();
+        git(repo.path(), &["checkout", "-b", "feature"]);
+        commit(repo.path(), "first.txt", "first\n");
+        let old_tip = commit(repo.path(), "second.txt", "second\n");
+        git(repo.path(), &["branch", "before-rebase"]);
+        git(repo.path(), &["checkout", "main"]);
+        commit(repo.path(), "unrelated.txt", "main moved\n");
+        git(repo.path(), &["checkout", "feature"]);
+        git(repo.path(), &["rebase", "main"]);
+        let new_tip = git(repo.path(), &["rev-parse", "HEAD"]);
+        assert_ne!(old_tip, new_tip);
+        git(
+            repo.path(),
+            &["update-ref", "refs/remotes/origin/feature", &new_tip],
+        );
+        assert!(integration(repo.path(), "feature").is_none());
+        git(repo.path(), &["checkout", "main"]);
+        git(
+            repo.path(),
+            &["merge", method, "feature", "-m", "Merge feature"],
+        );
+        assert_eq!(integration(repo.path(), "feature").unwrap().target, "main");
+        assert_eq!(
+            integration(repo.path(), "origin/feature").unwrap().target,
+            "main"
+        );
+        assert!(integration(repo.path(), "before-rebase").is_none());
+    }
 }
 
 #[test]
@@ -163,7 +180,7 @@ fn recognizes_ancestry_and_ignores_main_tags_empty_patches_and_unrelated_roots()
     git(repo.path(), &["checkout", "--orphan", "unrelated"]);
     git(repo.path(), &["commit", "-m", "Other root"]);
     git(repo.path(), &["checkout", "main"]);
-    assert_eq!(integration(repo.path(), "merged").unwrap().kind, "ancestry");
+    assert_eq!(integration(repo.path(), "merged").unwrap().target, "main");
     for name in ["main", "release", "empty", "unrelated"] {
         assert!(integration(repo.path(), name).is_none(), "{name}");
     }
@@ -252,7 +269,6 @@ fn uses_remote_main_when_local_main_is_behind_and_supports_master_and_repositori
     );
     let status = integration(repo.path(), "feature").unwrap();
     assert_eq!(status.target, "origin/main");
-    assert_eq!(status.kind, "ancestry");
     git(
         repo.path(),
         &["update-ref", "-d", "refs/remotes/origin/main"],

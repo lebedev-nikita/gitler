@@ -275,6 +275,7 @@ export function CommitGraph({
               className="accent-primary"
               type="checkbox"
               checked={onlyChanges}
+              disabled={snapshot.worktreeStatusPending}
               onChange={(event) => {
                 setOnlyChanges(event.target.checked);
                 scroll.current?.scrollTo(0, 0);
@@ -384,11 +385,6 @@ export function CommitGraph({
               const integration = row.node.worktree
                 ? null
                 : refsFor(row.node.id).find((ref) => ref.integration)?.integration;
-              const integrationLabel = integration
-                ? integration.kind === "ancestry"
-                  ? `Merged into ${integration.target}`
-                  : `Changes in ${integration.target}`
-                : null;
               return (
                 <div
                   className="absolute left-0 right-0 h-[42px]"
@@ -446,15 +442,11 @@ export function CommitGraph({
                             <Badge
                               variant="integrated"
                               className="h-[18px] py-0 px-[5px] rounded-[4px] text-[10px] leading-[1.333333]"
-                              data-integration={integration.kind}
-                              title={
-                                integration.kind === "ancestry"
-                                  ? `This branch is part of ${integration.target}'s commit history.`
-                                  : `All committed changes match changes in ${integration.target}, as after squash or rebase.${integration.commit ? ` Matching commit: ${shortHash(integration.commit)}.` : ""} Original commit links are preserved.`
-                              }
+                              data-integration="ancestry"
+                              title={`This branch is part of ${integration.target}'s commit history.`}
                             >
                               <Check data-icon="inline-start" aria-hidden="true" />
-                              {integrationLabel}
+                              {`Merged into ${integration.target}`}
                             </Badge>
                           )}
                           {row.node.worktree ? (
@@ -571,6 +563,7 @@ export function CommitGraph({
                                         tree.locked !== null ||
                                         tree.prunable !== null ||
                                         tree.error !== null ||
+                                        snapshot.worktreeStatusPending ||
                                         tree.files.length > 0,
                                     )}
                                     onClick={() =>

@@ -35,8 +35,6 @@ export type Commit = typeof CommitSchema.Type;
 
 export const BranchIntegrationSchema = Schema.Struct({
   target: Schema.String,
-  kind: Schema.Literals(["ancestry", "patch"]),
-  commit: Schema.NullOr(Schema.String),
 });
 export type BranchIntegration = typeof BranchIntegrationSchema.Type;
 
@@ -58,6 +56,7 @@ export const SnapshotSchema = Schema.Struct({
   commonDir: Schema.String,
   path: Schema.String,
   worktrees: Schema.Array(WorktreeSchema),
+  worktreeStatusPending: Schema.Boolean,
   commits: Schema.Array(CommitSchema),
   refs: Schema.Array(ReferenceSchema),
   stashes: Schema.Array(

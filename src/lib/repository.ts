@@ -48,14 +48,22 @@ export const desktop = isTauri();
 export const localRepository = desktop || browserConnection !== null;
 export const isDemo = (commonDir: string) => commonDir === "demo";
 
-const loadSnapshot = Effect.fn("loadSnapshot")(function* (path: string, limit: number) {
+const loadSnapshot = Effect.fn("loadSnapshot")(function* (
+  path: string,
+  limit: number,
+  includeWorktreeStatus: boolean,
+) {
   if (path === DEMO_PATH) return demoSnapshot();
   if (!localRepository)
     return yield* new RepositoryError({
       message: "Start just dev or open the desktop application to inspect a local repository.",
     });
   const transport = yield* GitTransport;
-  const payload = yield* transport.call("repository_snapshot", { path, limit });
+  const payload = yield* transport.call("repository_snapshot", {
+    path,
+    limit,
+    includeWorktreeStatus,
+  });
   return yield* Schema.decodeUnknownEffect(SnapshotSchema)(payload).pipe(
     Effect.mapError(
       (error) => new RepositoryError({ message: `Invalid repository response: ${error.message}` }),
@@ -231,8 +239,8 @@ export const repositoryApi = {
             Effect.flatMap(Schema.decodeUnknownEffect(Schema.NullOr(Schema.String))),
           ),
         ),
-  snapshot: (path: string, limit: number): Promise<Snapshot> =>
-    runtime.runPromise(loadSnapshot(path, limit)),
+  snapshot: (path: string, limit: number, includeWorktreeStatus = true): Promise<Snapshot> =>
+    runtime.runPromise(loadSnapshot(path, limit, includeWorktreeStatus)),
   detail: (common: string, selection: Selection, comparison: Comparison | null): Promise<Detail> =>
     runtime.runPromise(loadDetail(common, selection, comparison)),
   diff: (request: DiffRequest): Promise<DiffResult> => runtime.runPromise(loadDiff(request)),
