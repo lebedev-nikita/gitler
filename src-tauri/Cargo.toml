@@ -1,6 +1,6 @@
 [package]
 name = "gitler"
-version = "0.5.1"
+version = "0.5.2-rc.1"
 description = "A repository-wide Git graph and worktree inspector"
 license-file = "../LICENSE"
 authors = ["Gitler contributors"]
