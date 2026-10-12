@@ -1,14 +1,11 @@
-Gitler 0.5.0 adds native T3 Code thread creation from a selected local branch.
+Gitler 0.5.1 removes extra confirmations when creating a T3 Code thread.
 
 ## Changes
 
-- Choose **New T3 Code thread…** in a local branch context menu to create an empty thread named after the branch.
-- Reuse the branch’s registered worktree, including local edits. If none exists, create a worktree for that same branch without changing existing branches, indexes, or working files.
-- Connect directly to the running T3 Code server; no third-party CLI is required. Inherit the T3 project’s model and permission settings.
-- Show connection and installation guidance when T3 Code is unavailable. Validate the branch and worktree again before creation, and retain a created worktree if the request fails.
-- Include the base-folder copy action and shared tooltip improvements from 0.4.5-rc.1.
-
-The integration supports T3 Code orchestration protocol 1, including T3 Code 0.0.45. After creating a thread, Gitler opens T3 Code; select the branch-named thread there.
+- Choose **Create T3 Code thread** in a local branch context menu to start immediately.
+- Show a compact progress dialog while connecting and creating the thread. On success, open T3 Code and close the dialog automatically, without a success confirmation.
+- Keep errors and installation guidance visible. If opening T3 Code fails after creation, show the created thread’s reference for manual recovery.
+- Prevent duplicate creation during React effect replay and close progress without waiting for the graph to refresh.
 
 ## Downloads
 
