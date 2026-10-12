@@ -525,8 +525,8 @@ export function CommitGraph({
                               >
                                 <MessageSquarePlus />
                                 {branches.length === 1
-                                  ? "New T3 Code thread…"
-                                  : `New T3 Code thread from ${branch}…`}
+                                  ? "Create T3 Code thread"
+                                  : `Create T3 Code thread from ${branch}`}
                               </ContextMenuItem>
                             ))}
                             {branches.map((branch) => (

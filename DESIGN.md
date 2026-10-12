@@ -204,7 +204,7 @@ Controls have modest corners (`md`); graph labels and file selections are tighte
 
 **Transient surfaces.** Context menus use the popover surface, compact rounded items, and visible focus fill. Dialogs use the same material with larger corners and short title/description text. Rename dialogs show an editable Codex suggestion, regeneration and cancellation, with executable options collapsed. Discard dialogs show the working-copy path and a scrollable file checklist, followed by a destructive action naming the selection count. Merged-branch deletion dialogs show the merge target and full paths of the clean linked worktrees to remove. Containers remain flat rather than introducing a separate card grid.
 
-**T3 Code threads.** The branch context menu opens a focused review dialog showing the selected branch, existing worktree path or worktree-creation notice, and inherited model and permissions. **Create thread** leads to a thread reference for continuing in T3 Code. Connection failures show a compact unavailable state with a T3 Code GitHub link; creation failures retain their evidence and ask the user to check T3 Code before retrying.
+**T3 Code threads.** **Create T3 Code thread** in the branch context menu starts immediately. A compact progress dialog shows the selected branch and a spinner while connecting and creating, with no confirmation controls. On success, open T3 Code and dismiss the dialog without a success confirmation. Connection failures show a compact unavailable state with a T3 Code GitHub link; creation failures retain their evidence and ask the user to check T3 Code before retrying. If the thread was created but opening T3 Code fails, keep its reference visible for manual recovery.
 
 ## Do's and Don'ts
 

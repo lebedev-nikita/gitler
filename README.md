@@ -56,8 +56,9 @@ Deletion requires confirmation and a merge into the local default branch. Main b
 and the main worktree are protected; worktrees with changed, untracked, or ignored files
 must be cleaned first. Locked or unavailable worktrees cannot be deleted.
 
-Right-click a local branch and choose **New T3 Code thread…**, review the worktree,
-then choose **Create thread**. T3 Code must already be running with this repository
+Right-click a local branch and choose **Create T3 Code thread**. Creation starts
+immediately; a progress dialog closes automatically when Gitler opens T3 Code.
+T3 Code must already be running with this repository
 added as a project. Gitler supports its local orchestration protocol 1 (including
 v0.0.45), using T3 Code's configured model and permissions. The integration
 uses the matching T3 component for temporary authentication; no additional CLI
@@ -68,8 +69,8 @@ An existing registered worktree is reused with its working changes. Otherwise,
 Gitler creates a worktree for the same local branch under T3 Code's data folder
 without changing existing branches or working copies. The new worktree stays if
 thread creation fails; check T3 Code before retrying because the request may have
-succeeded. After creation, Gitler shows the thread reference and opens T3 Code;
-select the new branch-named thread there.
+succeeded. Select the new branch-named thread in T3 Code. If opening T3 Code
+fails, Gitler keeps the thread reference visible for recovery.
 
 Remote branches update when you open a repository and every minute afterward. Use
 **Refresh** to update them immediately. The status bar shows the last successful
