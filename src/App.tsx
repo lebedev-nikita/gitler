@@ -532,7 +532,10 @@ export default function App() {
                   previewOpen={previewOpen}
                   togglePreview={() => setPreviewOpen((value) => !value)}
                   view={inspectorView}
-                  changeView={(patch) => setInspectorView((current) => ({ ...current, ...patch }))}
+                  changeView={(patch) => {
+                    setInspectorView((current) => ({ ...current, ...patch }));
+                    if (patch.filePath !== undefined) setPreviewOpen(true);
+                  }}
                 />
               ) : undefined
             }

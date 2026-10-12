@@ -122,7 +122,7 @@ test("previews media versions, playback, errors and narrow layouts while preserv
   await page.getByRole("button", { name: "Close diff preview" }).click();
   await expect(page.getByLabel("Diff preview", { exact: true })).toHaveCount(0);
   await expect(page.getByLabel("Changed files")).toBeVisible();
-  await page.getByRole("button", { name: "Show diff preview" }).click();
+  await page.getByRole("button", { name: /image.svg/ }).click();
   await expect(afterImage).toBeVisible();
   await page.getByRole("button", { name: "Staged", exact: true }).click();
   await expect(afterImage).toHaveAttribute("src", before.dataUrl);
