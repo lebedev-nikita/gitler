@@ -1876,6 +1876,9 @@ fn pull_target(
         return Err("The branch's worktree changed. Refresh and try again.".into());
     }
     let tree = registered_worktree(common, &tree.path)?;
+    if tree.branch.as_deref() != Some(branch) {
+        return Err("The worktree's branch changed. Refresh and try again.".into());
+    }
     if tree.locked.is_some() || tree.prunable.is_some() || tree.head != expected_head {
         return Err("Unlock or repair this worktree, then refresh before pulling.".into());
     }
