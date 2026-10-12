@@ -119,6 +119,11 @@ test("previews media versions, playback, errors and narrow layouts while preserv
     .toBe(320);
   await expect(page.getByLabel("After media")).toContainText("320 × 180");
   await page.screenshot({ path: ".impeccable/review/media-desktop.png", fullPage: true });
+  await page.getByRole("button", { name: "Close diff preview" }).click();
+  await expect(page.getByLabel("Diff preview", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("Changed files")).toBeVisible();
+  await page.getByRole("button", { name: "Show diff preview" }).click();
+  await expect(afterImage).toBeVisible();
   await page.getByRole("button", { name: "Staged", exact: true }).click();
   await expect(afterImage).toHaveAttribute("src", before.dataUrl);
   await page.getByRole("button", { name: "All changes", exact: true }).click();

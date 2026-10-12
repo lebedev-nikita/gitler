@@ -70,8 +70,9 @@ test("diff preview can be hidden independently and stays hidden across selection
   await page.goto("/");
   const files = page.getByLabel("Changed files");
   await expect(page.getByLabel("Diff for src/auth/session.ts")).toBeVisible();
+  await page.screenshot({ path: ".impeccable/review/close-preview-desktop.png", fullPage: true });
   const original = await dimension(files, "height");
-  await page.getByRole("button", { name: "Hide diff preview" }).click();
+  await page.getByRole("button", { name: "Close diff preview" }).click();
   await expect(page.getByLabel("Diff preview", { exact: true })).toHaveCount(0);
   await expect(files).toBeVisible();
   expect(await dimension(files, "height")).toBeGreaterThan(original + 100);
@@ -79,7 +80,8 @@ test("diff preview can be hidden independently and stays hidden across selection
   await expect(page.getByLabel("Diff preview", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Show diff preview" }).click();
   await expect(page.getByLabel("Diff for tests/auth.test.ts")).toBeVisible();
-  await page.getByRole("button", { name: "Hide diff preview" }).click();
+  await page.getByRole("button", { name: "Close diff preview" }).focus();
+  await page.keyboard.press("Enter");
   await page
     .getByRole("button", { name: "Uncommitted changes on agent/git-parser", exact: true })
     .click();
@@ -145,6 +147,7 @@ test("narrow windows resize stacked panels and preserve the selected file across
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await expect(page.getByLabel("Diff for src/auth/session.ts")).toBeVisible();
+  await page.screenshot({ path: ".impeccable/review/close-preview-narrow.png", fullPage: true });
   const graph = page.getByRole("region", { name: "Commit graph" });
   const handle = page.getByRole("separator", { name: "Resize graph and details panels" });
   await expect(handle).toHaveAttribute("aria-orientation", "horizontal");

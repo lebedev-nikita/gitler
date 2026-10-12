@@ -1,6 +1,6 @@
 import { AppTooltip } from "@/components/AppTooltip";
 import { useState } from "react";
-import { Check, Copy, AlertTriangle, LoaderCircle } from "lucide-react";
+import { Check, Copy, AlertTriangle, LoaderCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -11,6 +11,16 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import type { LucideIcon } from "lucide-react";
+
+export function ClosePreviewButton({ close }: { close: () => void }) {
+  return (
+    <AppTooltip content="Close diff preview">
+      <Button variant="ghost" size="icon-sm" onClick={close} aria-label="Close diff preview">
+        <X />
+      </Button>
+    </AppTooltip>
+  );
+}
 
 export function CopyButton({
   value,
