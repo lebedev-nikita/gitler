@@ -1,10 +1,11 @@
-Gitler 0.5.2-rc.1 adds a close button to the file preview panel.
+Gitler 0.5.2-rc.2 reopens the file preview when you click a changed file.
 
 ## Changes
 
 - Close the lower diff or media preview with the **×** button at the top right of its header.
 - Keep commit details, the changed-file list, and the selected file when closing the preview.
-- Reopen the preview with **Show diff preview** beside **Changed files**. The hidden state persists across selections and app restarts.
+- Click any changed file to reopen its preview, including the file already selected.
+- You can also reopen the preview with **Show diff preview** beside **Changed files**. The hidden state persists across graph selections and app restarts until you open a file preview.
 
 ## Downloads
 

@@ -64,9 +64,7 @@ test("details can be hidden and reopened without reopening on graph selection", 
   await expect(page.getByLabel("Diff for src/auth/refresh.ts")).toBeVisible();
 });
 
-test("diff preview can be hidden independently and stays hidden across selections", async ({
-  page,
-}) => {
+test("diff preview closes independently and reopens on changed-file clicks", async ({ page }) => {
   await page.goto("/");
   const files = page.getByLabel("Changed files");
   await expect(page.getByLabel("Diff for src/auth/session.ts")).toBeVisible();
@@ -77,11 +75,13 @@ test("diff preview can be hidden independently and stays hidden across selection
   await expect(files).toBeVisible();
   expect(await dimension(files, "height")).toBeGreaterThan(original + 100);
   await page.getByRole("button", { name: "tests/auth.test.ts" }).click();
-  await expect(page.getByLabel("Diff preview", { exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "Show diff preview" }).click();
   await expect(page.getByLabel("Diff for tests/auth.test.ts")).toBeVisible();
   await page.getByRole("button", { name: "Close diff preview" }).focus();
   await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "tests/auth.test.ts" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByLabel("Diff for tests/auth.test.ts")).toBeVisible();
+  await page.getByRole("button", { name: "Close diff preview" }).click();
   await page
     .getByRole("button", { name: "Uncommitted changes on agent/git-parser", exact: true })
     .click();
