@@ -1,7 +1,8 @@
-Gitler 0.5.2-rc.2 reopens the file preview when you click a changed file.
+Gitler 0.5.2-rc.3 removes the legend and comparison hint below the commit graph.
 
 ## Changes
 
+- Give the commit graph more space by removing its bottom legend and comparison hint.
 - Close the lower diff or media preview with the **×** button at the top right of its header.
 - Keep commit details, the changed-file list, and the selected file when closing the preview.
 - Click any changed file to reopen its preview, including the file already selected.
