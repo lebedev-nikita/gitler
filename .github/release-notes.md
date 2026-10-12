@@ -1,11 +1,10 @@
-Gitler 0.5.1 removes extra confirmations when creating a T3 Code thread.
+Gitler 0.5.2-rc.1 adds a close button to the file preview panel.
 
 ## Changes
 
-- Choose **Create T3 Code thread** in a local branch context menu to start immediately.
-- Show a compact progress dialog while connecting and creating the thread. On success, open T3 Code and close the dialog automatically, without a success confirmation.
-- Keep errors and installation guidance visible. If opening T3 Code fails after creation, show the created thread’s reference for manual recovery.
-- Prevent duplicate creation during React effect replay and close progress without waiting for the graph to refresh.
+- Close the lower diff or media preview with the **×** button at the top right of its header.
+- Keep commit details, the changed-file list, and the selected file when closing the preview.
+- Reopen the preview with **Show diff preview** beside **Changed files**. The hidden state persists across selections and app restarts.
 
 ## Downloads
 

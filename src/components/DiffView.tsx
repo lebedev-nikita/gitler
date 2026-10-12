@@ -4,9 +4,17 @@ import { FileCode2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { parseDiff } from "@/lib/diff";
 import type { DiffResult } from "@/lib/models";
-import { CopyButton, EmptyMessage } from "./common";
+import { ClosePreviewButton, CopyButton, EmptyMessage } from "./common";
 
-export function DiffView({ diff, file }: { diff: DiffResult; file: string }) {
+export function DiffView({
+  diff,
+  file,
+  close,
+}: {
+  diff: DiffResult;
+  file: string;
+  close: () => void;
+}) {
   const lines = useMemo(() => parseDiff(diff.text), [diff.text]);
   const additions = lines.filter((line) => line.kind === "addition").length;
   const deletions = lines.filter((line) => line.kind === "deletion").length;
@@ -22,6 +30,7 @@ export function DiffView({ diff, file }: { diff: DiffResult; file: string }) {
           <span className="text-removed">−{deletions}</span>
         </div>
         <CopyButton value={diff.text} label="Copy diff" />
+        <ClosePreviewButton close={close} />
       </div>
       {diff.truncated && (
         <p

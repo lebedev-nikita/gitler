@@ -429,9 +429,9 @@ export function Inspector({
                       />
                     </div>
                   ) : isMedia && media.data && selectedFile ? (
-                    <MediaView media={media.data} file={selectedFile.path} />
+                    <MediaView media={media.data} file={selectedFile.path} close={togglePreview} />
                   ) : diff.data && selectedFile ? (
-                    <DiffView diff={diff.data} file={selectedFile.path} />
+                    <DiffView diff={diff.data} file={selectedFile.path} close={togglePreview} />
                   ) : null}
                 </div>
               ) : undefined

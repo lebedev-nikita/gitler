@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Image, Music2, Video } from "lucide-react";
 import type { MediaResult, MediaVersion } from "@/lib/models";
 import { mediaKind } from "@/lib/media";
-import { EmptyMessage } from "./common";
+import { ClosePreviewButton, EmptyMessage } from "./common";
 
 const mediaIcons = { image: Image, video: Video, audio: Music2 };
 
@@ -98,7 +98,15 @@ function MediaSide({
   );
 }
 
-export function MediaView({ media, file }: { media: MediaResult; file: string }) {
+export function MediaView({
+  media,
+  file,
+  close,
+}: {
+  media: MediaResult;
+  file: string;
+  close: () => void;
+}) {
   const Icon = mediaIcons[mediaKind(file) ?? "image"];
   return (
     <div className="flex-1 min-h-0 min-w-0 flex flex-col">
@@ -108,6 +116,7 @@ export function MediaView({ media, file }: { media: MediaResult; file: string })
           <span className="flex-1 truncate font-mono text-[10px]">{file}</span>
         </AppTooltip>
         <span className="text-muted-foreground text-[10px]">Preview</span>
+        <ClosePreviewButton close={close} />
       </div>
       <div
         className="flex-1 min-h-0 overflow-auto bg-diff p-[15px] [scrollbar-gutter:stable]"
