@@ -17,6 +17,7 @@ TypeScript, and shadcn/ui. Currently supported only on macOS with Apple Silicon.
 - Renames local branches manually or suggests names with your installed Codex CLI for review.
 - Creates empty T3 Code threads for local branches, reusing their worktree or creating one.
 - Discards selected staged, unstaged, and untracked files in a chosen working copy after confirmation.
+- Pulls a selected local branch from its configured upstream with a safe fast-forward.
 - Fetches remote branches in the background and shows new commits without changing local work.
 - Opens GitHub and other supported remote repositories in your default browser.
 - Filters and searches loaded history; loads older commits on demand.
@@ -46,6 +47,11 @@ Gitler detects common installation paths and accepts an explicit executable path
 The selected branch's commits and working diffs are sent to Codex for generation.
 The suggested name is editable before applying a local rename; remote names are unchanged.
 Manual renaming works without Codex. The same context menu offers selected-file discards and merged-branch deletion with linked worktrees.
+
+Right-click a local branch and choose **Pull** to fetch its configured upstream and
+fast-forward it. Gitler updates its registered worktree, or just the branch if it
+has none. Commit or stash working changes first. Diverged history requires a manual
+merge or rebase; Gitler preserves ignored files and other branches and worktrees.
 
 Discarding restores selected files to HEAD in both the index and working copy.
 Selected untracked and newly added files are deleted permanently. Gitler verifies

@@ -1,12 +1,11 @@
-Gitler 0.5.2-rc.3 removes the legend and comparison hint below the commit graph.
+Gitler 0.5.2-rc.4 adds **Pull** to the local branch context menu.
 
 ## Changes
 
-- Give the commit graph more space by removing its bottom legend and comparison hint.
-- Close the lower diff or media preview with the **×** button at the top right of its header.
-- Keep commit details, the changed-file list, and the selected file when closing the preview.
-- Click any changed file to reopen its preview, including the file already selected.
-- You can also reopen the preview with **Show diff preview** beside **Changed files**. The hidden state persists across graph selections and app restarts until you open a file preview.
+- Right-click a local branch label, its tip commit, or its uncommitted node and choose **Pull**.
+- Fetch the configured upstream and fast-forward the selected branch and its registered worktree. Branches without a worktree update without checking them out.
+- Show progress and actionable errors, then refresh the graph.
+- Require a clean working copy and reject stale HEADs, changed worktrees, and diverged history. Preserve ignored files, tags, and other branches and worktrees.
 
 ## Downloads
 

@@ -183,6 +183,15 @@ const action = Effect.fn("repositoryAction")(function* <A, I>(
 });
 
 export const repositoryApi = {
+  pullBranch: (
+    commonDir: string,
+    branch: string,
+    expectedHead: string,
+    expectedWorktree: string | null,
+  ) =>
+    runtime.runPromise(
+      action(commonDir, "pull_branch", { branch, expectedHead, expectedWorktree }, Schema.Null),
+    ),
   prepareThread: (commonDir: string, branch: string) =>
     runtime.runPromise(action(commonDir, "prepare_t3_thread", { branch }, ThreadPreparationSchema)),
   startThread: (

@@ -196,5 +196,39 @@ describe.runIf(process.platform === "darwin" && process.arch === "arm64")(
       expect(snapshot.commonDir).toBe(commonDir);
       expect(git("branch", "--show-current")).toBe("main");
     });
+
+    it("pulls the selected linked worktree through the real browser transport", async () => {
+      const head = git("rev-parse", "agent/browser");
+      git("config", "branch.agent/browser.remote", ".");
+      git("config", "branch.agent/browser.merge", "refs/heads/main");
+      await writeFile(join(repository, "note.txt"), "upstream edit\n");
+      git("add", "note.txt");
+      git("commit", "-m", "Upstream for browser pull");
+      const target = git("rev-parse", "main");
+      await writeFile(join(repository, "note.txt"), "preserve main edit\n");
+      const index = await readFile(join(commonDir, "index"));
+      expect(
+        await call("pull_branch", {
+          commonDir,
+          branch: "agent/browser",
+          expectedHead: head,
+          expectedWorktree: linked,
+        }),
+      ).toBeNull();
+      expect(git("rev-parse", "agent/browser")).toBe(target);
+      expect(await readFile(join(linked, "note.txt"), "utf8")).toBe("upstream edit\n");
+      expect(await readFile(join(repository, "note.txt"), "utf8")).toBe("preserve main edit\n");
+      expect(await readFile(join(commonDir, "index"))).toEqual(index);
+      expect(
+        (
+          await invoke("pull_branch", {
+            commonDir,
+            branch: "agent/browser",
+            expectedHead: head,
+            expectedWorktree: linked,
+          })
+        ).status,
+      ).toBe(400);
+    });
   },
 );

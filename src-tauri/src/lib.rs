@@ -79,6 +79,25 @@ async fn repository_snapshot(
 }
 
 #[tauri::command]
+async fn pull_branch(
+    common_dir: String,
+    branch: String,
+    expected_head: String,
+    expected_worktree: Option<String>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git::pull_branch(
+            &common_dir,
+            &branch,
+            &expected_head,
+            expected_worktree.as_deref(),
+        )
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 async fn fetch_remotes(common_dir: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || git::fetch_remotes(&common_dir))
         .await
@@ -344,6 +363,7 @@ pub fn run() {
             generate_branch_name,
             cancel_codegen,
             rename_branch,
+            pull_branch,
             prepare_delete_branch,
             delete_branch,
             prepare_discard,
