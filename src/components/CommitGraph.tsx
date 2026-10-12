@@ -641,19 +641,6 @@ export function CommitGraph({
           </div>
         )}
       </div>
-      <div className="h-[34px] flex justify-between gap-[12px] items-center border-t border-border py-0 px-[23px] flex-none text-muted-foreground text-[10px] compact:h-[28px] compact:py-0 compact:px-[14px]">
-        <div className="flex gap-[16px]">
-          <span className="flex gap-[6px] items-center">
-            <i className="size-[6px] rounded-full bg-commit-node" />
-            Committed
-          </span>
-          <span className="flex gap-[6px] items-center">
-            <i className="size-[6px] rounded-full border border-dirty" />
-            Uncommitted
-          </span>
-        </div>
-        <span className="narrow:hidden">Select a node, then right-click another to diff</span>
-      </div>
     </section>
   );
 }
