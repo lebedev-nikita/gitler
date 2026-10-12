@@ -171,6 +171,7 @@ export const DeleteBranchPlanSchema = Schema.Struct({
 });
 export type DeleteBranchPlan = typeof DeleteBranchPlanSchema.Type;
 export type GraphAction =
+  | { kind: "pull"; branch: string; worktree: string | null; expectedHead: string }
   | { kind: "thread"; branch: string; worktree: string | null }
   | { kind: "rename"; branch: string; worktree: string | null }
   | { kind: "delete"; branch: string; worktree: string | null }

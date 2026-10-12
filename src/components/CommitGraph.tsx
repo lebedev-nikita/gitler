@@ -2,6 +2,7 @@ import { AppTooltip } from "@/components/AppTooltip";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
+  Download,
   Check,
   Copy,
   GitCompareArrows,
@@ -518,6 +519,26 @@ export function CommitGraph({
                         <>
                           <ContextMenuSeparator />
                           <ContextMenuGroup>
+                            {branches.map((branch) => (
+                              <ContextMenuItem
+                                key={`pull:${branch}`}
+                                onClick={() =>
+                                  act({
+                                    kind: "pull",
+                                    branch,
+                                    expectedHead: snapshot.refs.find(
+                                      (ref) => ref.kind === "branch" && ref.name === branch,
+                                    )!.oid,
+                                    worktree:
+                                      snapshot.worktrees.find((tree) => tree.branch === branch)
+                                        ?.path ?? null,
+                                  })
+                                }
+                              >
+                                <Download />
+                                {branches.length === 1 ? "Pull" : `Pull ${branch}`}
+                              </ContextMenuItem>
+                            ))}
                             {branches.map((branch) => (
                               <ContextMenuItem
                                 key={`thread:${branch}`}

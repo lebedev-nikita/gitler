@@ -32,6 +32,7 @@ import { isDemo, repositoryApi } from "@/lib/repository";
 import type { DeleteBranchPlan, DiscardPlan, GraphAction, Snapshot } from "@/lib/models";
 import { shortPath } from "./common";
 import { ThreadActions } from "./ThreadActions";
+import { PullActions } from "./PullActions";
 
 function savedCodexPath() {
   try {
@@ -50,6 +51,7 @@ type GraphActionsProps = {
 
 export function GraphActions(props: GraphActionsProps) {
   if (props.action.kind === "thread") return <ThreadActions {...props} action={props.action} />;
+  if (props.action.kind === "pull") return <PullActions {...props} action={props.action} />;
   return <BranchActions {...props} action={props.action} />;
 }
 
@@ -59,7 +61,7 @@ function BranchActions({
   close,
   changed,
 }: {
-  action: Exclude<GraphAction, { kind: "thread" }>;
+  action: Exclude<GraphAction, { kind: "thread" | "pull" }>;
   snapshot: Snapshot;
   close: () => void;
   changed: () => Promise<void>;

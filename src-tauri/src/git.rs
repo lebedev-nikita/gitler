@@ -736,39 +736,7 @@ pub fn fetch_remotes(common_dir: &str) -> Result<(), String> {
     let mut errors = Vec::new();
     for remote in remotes(&common)? {
         let refspec = format!("+refs/heads/*:refs/remotes/{}/*", remote.name);
-        let mut command = git_command();
-        if std::env::var_os("GIT_SSH_COMMAND").is_none()
-            && std::env::var_os("GIT_SSH").is_none()
-            && in_repo(&common, &["config", "--get", "core.sshCommand"]).is_err()
-        {
-            command.args([
-                "-c",
-                "core.sshCommand=ssh -oBatchMode=yes -oConnectTimeout=10",
-            ]);
-        }
-        command
-            .arg("--git-dir")
-            .arg(&common)
-            .args([
-                "-c",
-                "credential.interactive=false",
-                "fetch",
-                "--no-tags",
-                "--no-prune",
-                "--no-prune-tags",
-                "--no-write-fetch-head",
-                "--no-recurse-submodules",
-                "--no-auto-maintenance",
-                "--refmap=",
-                "--",
-                &remote.name,
-                &refspec,
-            ])
-            .current_dir(root)
-            .stdin(Stdio::null())
-            .env("GIT_ASKPASS", "")
-            .env("SSH_ASKPASS_REQUIRE", "never");
-        if let Err(error) = execute(command) {
+        if let Err(error) = fetch_remote(&common, root, &remote.name, &refspec) {
             errors.push(format!("{}: {error}", remote.name));
         }
     }
@@ -779,6 +747,42 @@ pub fn fetch_remotes(common_dir: &str) -> Result<(), String> {
         "Could not update remotes. Check your network and Git authentication.\n{}",
         errors.join("\n")
     ))
+}
+
+fn fetch_remote(common: &Path, root: &Path, remote: &str, refspec: &str) -> Result<(), String> {
+    let mut command = git_command();
+    if std::env::var_os("GIT_SSH_COMMAND").is_none()
+        && std::env::var_os("GIT_SSH").is_none()
+        && in_repo(common, &["config", "--get", "core.sshCommand"]).is_err()
+    {
+        command.args([
+            "-c",
+            "core.sshCommand=ssh -oBatchMode=yes -oConnectTimeout=10",
+        ]);
+    }
+    command
+        .arg("--git-dir")
+        .arg(common)
+        .args([
+            "-c",
+            "credential.interactive=false",
+            "fetch",
+            "--no-tags",
+            "--no-prune",
+            "--no-prune-tags",
+            "--no-write-fetch-head",
+            "--no-recurse-submodules",
+            "--no-auto-maintenance",
+            "--refmap=",
+            "--",
+            remote,
+            refspec,
+        ])
+        .current_dir(root)
+        .stdin(Stdio::null())
+        .env("GIT_ASKPASS", "")
+        .env("SSH_ASKPASS_REQUIRE", "never");
+    execute(command).map(|_| ())
 }
 
 pub fn snapshot(path: &str, limit: usize) -> Result<Snapshot, String> {
@@ -1836,6 +1840,180 @@ pub fn branch_context(
         }
     }
     Ok(BranchContext { head, text })
+}
+
+fn pull_target(
+    common: &Path,
+    branch: &str,
+    expected_head: &str,
+    expected_worktree: Option<&str>,
+) -> Result<Option<Worktree>, String> {
+    if branch_head(common, branch)? != expected_head {
+        return Err("The branch moved. Refresh the repository and try Pull again.".into());
+    }
+    let trees = parse_worktrees(&in_repo(
+        common,
+        &["worktree", "list", "--porcelain", "-z"],
+    )?);
+    let matching: Vec<_> = trees
+        .into_iter()
+        .filter(|tree| tree.branch.as_deref() == Some(branch))
+        .collect();
+    if matching.len() > 1 {
+        return Err(
+            "This branch is checked out in multiple worktrees. Resolve this before pulling.".into(),
+        );
+    }
+    let Some(tree) = matching.into_iter().next() else {
+        if expected_worktree.is_some() {
+            return Err("The branch's worktree changed. Refresh and try again.".into());
+        }
+        return Ok(None);
+    };
+    let expected_path = expected_worktree.and_then(|path| std::fs::canonicalize(path).ok());
+    let actual_path = std::fs::canonicalize(&tree.path).ok();
+    if expected_path.is_none() || expected_path != actual_path {
+        return Err("The branch's worktree changed. Refresh and try again.".into());
+    }
+    let tree = registered_worktree(common, &tree.path)?;
+    if tree.locked.is_some() || tree.prunable.is_some() || tree.head != expected_head {
+        return Err("Unlock or repair this worktree, then refresh before pulling.".into());
+    }
+    let root = Path::new(&tree.path);
+    if !in_worktree(
+        root,
+        &[
+            "status",
+            "--porcelain=v1",
+            "-z",
+            "--untracked-files=all",
+            "--ignore-submodules=none",
+        ],
+    )?
+    .is_empty()
+    {
+        return Err("Commit or stash uncommitted changes in this worktree before pulling.".into());
+    }
+    for state in [
+        "MERGE_HEAD",
+        "CHERRY_PICK_HEAD",
+        "REVERT_HEAD",
+        "rebase-merge",
+        "rebase-apply",
+        "sequencer",
+        "BISECT_LOG",
+    ] {
+        let path = string(&in_worktree(
+            root,
+            &["rev-parse", "--path-format=absolute", "--git-path", state],
+        )?);
+        if Path::new(path.trim()).exists() {
+            return Err("Finish the Git operation in this worktree before pulling.".into());
+        }
+    }
+    Ok(Some(tree))
+}
+
+/// Explicit pull: fetch only the configured upstream, then fast-forward the selected branch.
+pub fn pull_branch(
+    common_dir: &str,
+    branch: &str,
+    expected_head: &str,
+    expected_worktree: Option<&str>,
+) -> Result<(), String> {
+    let _guard = MUTATIONS
+        .lock()
+        .map_err(|_| "Git mutation lock unavailable")?;
+    let common = validate_common(common_dir)?;
+    let tree = pull_target(&common, branch, expected_head, expected_worktree)?;
+    let config = |key: &str| -> Result<String, String> {
+        let value = string(&in_repo(&common, &["config", "--get-all", key])?);
+        let values: Vec<_> = value.lines().collect();
+        if values.len() != 1 || values[0].is_empty() {
+            return Err("Configure one upstream branch before pulling.".into());
+        }
+        Ok(values[0].to_owned())
+    };
+    let remote = config(&format!("branch.{branch}.remote")).map_err(|_| {
+        "No upstream remote configured. Set an upstream branch in Git, then retry Pull."
+    })?;
+    let source = config(&format!("branch.{branch}.merge"))
+        .map_err(|_| "Configure one upstream branch in Git before pulling.")?;
+    let upstream_branch = source
+        .strip_prefix("refs/heads/")
+        .ok_or("The upstream must be a branch.")?;
+    validate_branch(upstream_branch)?;
+    let target_ref = if remote == "." {
+        source
+    } else {
+        if !remotes(&common)?.iter().any(|item| item.name == remote) {
+            return Err("The upstream remote is no longer configured.".into());
+        }
+        let target = format!("refs/remotes/{remote}/{upstream_branch}");
+        let mut check = git_command();
+        check.args(["check-ref-format", &target]);
+        execute(check)?;
+        let root = tree
+            .as_ref()
+            .map(|tree| Path::new(&tree.path))
+            .unwrap_or(&common);
+        fetch_remote(&common, root, &remote, &format!("+{source}:{target}"))?;
+        target
+    };
+    let target = string(&in_repo(
+        &common,
+        &["rev-parse", "--verify", &format!("{target_ref}^{{commit}}")],
+    )?)
+    .trim()
+    .to_owned();
+    valid_oid(&target)?;
+    let tree = pull_target(&common, branch, expected_head, expected_worktree)?;
+    let base = string(&in_repo(&common, &["merge-base", expected_head, &target])?)
+        .trim()
+        .to_owned();
+    if base == target {
+        return Ok(());
+    }
+    if base != expected_head {
+        return Err(
+            "Local and upstream histories have diverged. Merge or rebase in Git, then retry Pull."
+                .into(),
+        );
+    }
+    if let Some(tree) = tree {
+        in_worktree(
+            Path::new(&tree.path),
+            &[
+                "-c",
+                "core.hooksPath=/dev/null",
+                "-c",
+                "submodule.recurse=false",
+                "-c",
+                &format!("branch.{branch}.mergeOptions="),
+                "merge",
+                "--ff-only",
+                "--no-autostash",
+                "--no-overwrite-ignore",
+                "--",
+                &target,
+            ],
+        )?;
+        return Ok(());
+    }
+    in_repo(
+        &common,
+        &[
+            "-c",
+            "core.hooksPath=/dev/null",
+            "update-ref",
+            "-m",
+            "Gitler: pull (fast-forward)",
+            &format!("refs/heads/{branch}"),
+            &target,
+            expected_head,
+        ],
+    )?;
+    Ok(())
 }
 
 pub fn rename_branch(

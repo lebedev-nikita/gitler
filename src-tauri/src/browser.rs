@@ -45,6 +45,12 @@ enum Command {
     FetchRemotes {
         common_dir: String,
     },
+    PullBranch {
+        common_dir: String,
+        branch: String,
+        expected_head: String,
+        expected_worktree: Option<String>,
+    },
     OpenRemote {
         common_dir: String,
         name: String,
@@ -145,6 +151,17 @@ fn dispatch(command: Command, jobs: &codex::Jobs) -> Result<Value, String> {
             include_worktree_status.unwrap_or(true),
         )),
         Command::FetchRemotes { common_dir } => value(git::fetch_remotes(&common_dir)),
+        Command::PullBranch {
+            common_dir,
+            branch,
+            expected_head,
+            expected_worktree,
+        } => value(git::pull_branch(
+            &common_dir,
+            &branch,
+            &expected_head,
+            expected_worktree.as_deref(),
+        )),
         Command::OpenRemote { common_dir, name } => {
             let url = git::remote_url(&common_dir, &name)?;
             let status = std::process::Command::new("open")
