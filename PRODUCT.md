@@ -6,38 +6,45 @@
 
 web
 
-The web interface runs locally inside a Tauri desktop application for macOS on Apple Silicon.
+A local web interface inside a Tauri desktop app for macOS on Apple Silicon.
 
 ## Stack
 
-User-selected: Tauri, React, TypeScript, shadcn/ui. Bun and Effect follow the user's stack preferences.
+Tauri, React, TypeScript, shadcn/ui, Bun, and Effect.
 
 ## Users
 
-Developers working with many agents that create Git worktrees.
+Developers working with agents that create Git worktrees.
 
 ## Product Purpose
 
-Find uncommitted work left across worktrees while inspecting the repository's full history.
+Find uncommitted work across worktrees while inspecting the repository's history.
 
 ## Operating Context
 
-Changes are merged into main while agents work on different branches in separate worktrees.
-The application opens from the GUI or CLI using any path inside the repository.
+Agents work on branches in separate worktrees while changes are merged into main.
+Opening any repository or worktree path identifies the same repository.
 
 ## Capabilities and Constraints
 
-Repository-wide navigation independent of the currently checked-out branch. Git Graph is the functional reference.
-Configured remotes are visible and supported remote URLs open in the browser. Remote-tracking branches update automatically every minute; failed updates expose a retry action.
-Snapshot inspection remains read-only. Background fetches may update only remote-tracking branches, preserving local branches, tags, indexes, and working files regardless of configured fetch refspecs. Other mutations are limited to reviewed local branch renames, explicit worktree creation for a T3 Code thread on an existing local branch, confirmed selected-file discards, and confirmed deletion of merged local branches with clean linked worktrees. Main branches and the main worktree are protected. The interface language is English.
-Local branches can start empty threads in an already running T3 Code project, inheriting its model and permissions. Reuse the branch's registered worktree or create one for the same branch while preserving existing working copies. Keep created worktrees if the T3 Code request fails. Integration uses T3 Code's local orchestration protocol 1 and temporary authentication through its matching bundled component; no additional CLI installation is required.
-Worktrees are part of branches, never a separate top-level concept. The user requested a
-minimal interface with no left branch panel and filters exposed only as needed.
-Open decisions: broader mutation scope and full Git Graph feature parity.
+- Repository-wide history and working changes are visible without switching branches.
+- Worktrees appear as branch metadata, with detached work discoverable in the graph.
+- The workspace centers on the graph and optional diff inspector; filters open on demand.
+- Remote branches update automatically, with status and retry actions available.
+- Explicit actions support fast-forward pulls, local branch renames, T3 Code thread
+  creation, selected-file discards, and deletion of merged local branches and clean worktrees.
+- T3 Code thread creation inherits project settings and reuses or creates a worktree
+  on the selected local branch. Created worktrees remain if the request fails.
+- Inspection is read-only; mutation and repository-safety requirements are defined in
+  [AGENTS.md](AGENTS.md). T3 service refs are hidden from history.
+- The interface language is English. Git Graph is the functional reference;
+  broader mutation scope and full feature parity remain open decisions.
 
 ## Brand Commitments
 
-Repository name: Gitler. Existing icon: assets/icon.svg.
+Name: Gitler. App icon and palette: [assets/icons/base.png](assets/icons/base.png).
+The text-free mark in [assets/icons/mark.png](assets/icons/mark.png) is used by T3
+Code and browser favicons. See [icon provenance](assets/icons/PROVENANCE.md).
 
 ## Product Principles
 

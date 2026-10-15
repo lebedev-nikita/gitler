@@ -10,4 +10,4 @@ bun run tauri icon assets/icons/base.png --output /tmp/gitler-app-icons
 
 The bundle uses `32x32.png`, `128x128.png`, `128x128@2x.png`, and `icon.icns`
 from that output. See [source provenance](../../assets/icons/PROVENANCE.md)
-for the separate text-free variant and its generation prompts.
+for the separate text-free variant and browser favicons.
