@@ -90,18 +90,34 @@ open a linked worktree. Click the remote-update status in the footer to inspect
 and open other remotes. Local-path remotes and SSH aliases without a web hostname
 have no browser link.
 
-## Download
+## Installation
 
-Install on macOS with Apple Silicon using Homebrew:
+### Homebrew
+
+On a Mac with Apple Silicon, install [Homebrew](https://brew.sh) if needed, then run:
 
 ```sh
 brew install --cask jeff-business/tap/gitler
+```
+
+The [Homebrew tap](https://github.com/jeff-business/homebrew-tap) installs
+`Gitler.app` in `/Applications`, the `gitler` command, and Git. Open Gitler from
+Applications, or open a repository from your terminal:
+
+```sh
 gitler /path/to/repository
 ```
 
-The [Homebrew tap](https://github.com/jeff-business/homebrew-tap) installs the app,
-the `gitler` command, and Git. It tracks the newest published version, including
-release candidates. Upgrade with `brew update && brew upgrade --cask gitler`.
+To update an existing installation:
+
+```sh
+brew update
+brew upgrade --cask jeff-business/tap/gitler
+```
+
+The tap tracks the newest published version, including release candidates.
+
+### Direct download
 
 The DMG and app archive are also available from
 [GitHub Releases](https://github.com/lebedev-nikita/gitler/releases/latest).
