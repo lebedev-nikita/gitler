@@ -1,13 +1,10 @@
-Gitler 0.5.2 hides T3 service checkpoints from repository history and includes the improvements from the 0.5.2 release candidates.
+Gitler 0.5.3 supports creating threads in both T3 Code Alpha and Nightly.
 
 ## Changes
 
-- Exclude all `refs/t3/*` service refs from the commit graph and commit-hash search, regardless of checkpoint format. Keep the stored checkpoints available to T3 Code.
-- Preserve real history and detached worktree commits when service checkpoints exceed the history page size.
-- Right-click a local branch label, its tip commit, or its uncommitted node and choose **Pull**.
-- Fetch the configured upstream and fast-forward the selected branch and its registered worktree. Branches without a worktree update without checking them out.
-- Show progress and actionable errors, then refresh the graph.
-- Require a clean working copy and reject stale HEADs, changed worktrees, and diverged history. Preserve ignored files, tags, and other branches and worktrees.
+- Support orchestration protocols 1 and 2, including Nightly's WebSocket API for thread creation.
+- Respect built-in provider defaults and project-specific provider enablement when choosing the thread model.
+- Open the matching T3 Code application after creating a thread.
 
 ## Downloads
 

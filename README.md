@@ -87,9 +87,9 @@ branch's commits and working diffs are sent to Codex; review the suggestion befo
 renaming. Manual renaming works without Codex.
 
 **T3 Code threads:** **Create T3 Code thread** starts an empty thread using the
-project's model and permissions. [T3 Code](https://github.com/pingdotgg/t3code#installation)
-must be running with the repository added as a project and support orchestration
-protocol 1. No additional CLI is needed. Gitler reuses the branch's registered
+project's model and permissions. [T3 Code Alpha or Nightly](https://github.com/pingdotgg/t3code#installation)
+must be running with the repository added as a project. Orchestration protocols
+1 and 2 are supported; no additional CLI is needed. Gitler reuses the branch's registered
 worktree or creates one on that existing branch. Created worktrees remain if the
 request fails; check T3 Code before retrying. If opening T3 Code fails after
 creation, the dialog retains the thread reference for recovery.
