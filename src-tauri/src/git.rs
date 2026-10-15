@@ -591,7 +591,7 @@ pub fn resolve_commit(common_dir: &str, revision: &str) -> Result<String, String
             "--format=%(refname)",
             "--points-at",
             &oid,
-            "refs/t3/checkpoints",
+            "refs/t3",
         ],
     )?;
     if !checkpoints.is_empty() {
@@ -605,8 +605,8 @@ fn log_commits(common: &Path, worktrees: &[Worktree], limit: usize) -> Result<Ve
     let mut command = git_command();
     command.arg("--git-dir").arg(common).args([
         "log",
-        // Exclude service snapshots before pagination; keep real worktree heads below.
-        "--exclude=refs/t3/checkpoints/*",
+        // Exclude all T3 service refs before pagination, regardless of their layout.
+        "--exclude=refs/t3/*",
         "--all",
         "--topo-order",
         "-z",

@@ -261,11 +261,18 @@ fn hides_checkpoints_without_losing_history_or_detached_worktrees() {
     let tree = git(repo.path(), &["rev-parse", "HEAD^{tree}"]);
     let mut checkpoints = Vec::new();
     // More checkpoints than the minimum history limit must not crowd out real commits.
-    for turn in 0..55 {
-        let reference = format!("refs/t3/checkpoints/test-thread/turn/{turn}");
-        let message = format!("t3 checkpoint ref={reference}");
-        let oid = git(repo.path(), &["commit-tree", &tree, "-m", &message]);
-        checkpoints.push((reference, oid));
+    for prefix in [
+        "refs/t3/checkpoints/test-thread/turn",
+        "refs/t3/orchestration-v2/checkpoints/test-thread/ordinal",
+        // A different service ref layout must stay hidden without another filter update.
+        "refs/t3/future-snapshots/test-thread",
+    ] {
+        for turn in 0..55 {
+            let reference = format!("{prefix}/{turn}");
+            let message = format!("t3 checkpoint ref={reference}");
+            let oid = git(repo.path(), &["commit-tree", &tree, "-m", &message]);
+            checkpoints.push((reference, oid));
+        }
     }
     let mut update = Command::new("git")
         .arg("-C")
@@ -285,7 +292,7 @@ fn hides_checkpoints_without_losing_history_or_detached_worktrees() {
         &[
             "for-each-ref",
             "--format=%(refname) %(objectname)",
-            "refs/t3/checkpoints/",
+            "refs/t3/",
         ],
     );
     assert_eq!(checkpoint_refs.lines().count(), checkpoints.len());
@@ -314,14 +321,14 @@ fn hides_checkpoints_without_losing_history_or_detached_worktrees() {
         assert!(snapshot
             .refs
             .iter()
-            .all(|reference| !reference.full_name.starts_with("refs/t3/checkpoints/")));
+            .all(|reference| !reference.full_name.starts_with("refs/t3/")));
         assert_eq!(
             git::resolve_commit(&snapshot.common_dir, &first[..7]).unwrap(),
             first
         );
-        // Cover both sides of the history limit and the final checkpoint;
-        // the snapshot above verifies that all 55 checkpoints are excluded.
-        for turn in [0, 49, 54] {
+        // Cover both sides of the history limit and the final checkpoint in each namespace;
+        // the snapshot above verifies that all 165 checkpoints are excluded.
+        for turn in [0, 49, 54, 55, 104, 109, 110, 159, 164] {
             let (_, oid) = &checkpoints[turn];
             assert!(git::resolve_commit(&snapshot.common_dir, oid).is_err());
             assert!(git::resolve_commit(&snapshot.common_dir, &oid[..7]).is_err());
@@ -336,7 +343,7 @@ fn hides_checkpoints_without_losing_history_or_detached_worktrees() {
             &[
                 "for-each-ref",
                 "--format=%(refname) %(objectname)",
-                "refs/t3/checkpoints/"
+                "refs/t3/"
             ],
         ),
         checkpoint_refs
