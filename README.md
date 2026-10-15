@@ -13,10 +13,10 @@ registered worktree without switching branches. Supports macOS with Apple Silico
 Install [Homebrew](https://brew.sh) if needed, then run:
 
 ```sh
-brew install --cask jeff-business/tap/gitler
+brew install --cask lebedev-nikita/tap/gitler
 ```
 
-The [tap](https://github.com/jeff-business/homebrew-tap) installs `Gitler.app` in
+The [tap](https://github.com/lebedev-nikita/homebrew-tap) installs `Gitler.app` in
 `/Applications`, the `gitler` command, and Git. Open the app from Applications or
 pass a repository or worktree path:
 
@@ -28,10 +28,15 @@ To update:
 
 ```sh
 brew update
-brew upgrade --cask jeff-business/tap/gitler
+brew upgrade --cask lebedev-nikita/tap/gitler
 ```
 
-The tap tracks the newest published version, including release candidates.
+The tap tracks the newest published version, including release candidates. If you
+installed from `jeff-business/tap`, switch with:
+
+```sh
+brew reinstall --cask lebedev-nikita/tap/gitler
+```
 
 ### Direct download
 
@@ -125,17 +130,17 @@ Keep the tag and versions in `package.json`, `src-tauri/Cargo.toml`,
 [release notes](.github/release-notes.md) before tagging. Pushes to `main` and pull
 requests run checks and package the app without publishing.
 
-Releases publish a DMG, app archive, and checksums, then update the Homebrew tap.
-The `HOMEBREW_TAP_TOKEN` Actions secret needs `Contents: Read and write` access to
-`jeff-business/homebrew-tap`. If the tap update fails after publication, retry it
-with [scripts/release.py](scripts/release.py) using an account with tap access:
+Releases publish a DMG, app archive, and checksums. The
+[Homebrew updater](https://github.com/lebedev-nikita/homebrew-tap/blob/main/.github/workflows/update-gitler.yml)
+checks published releases hourly using the tap's own `GITHUB_TOKEN`; no separate
+publishing token is required. To update the tap immediately after a release, run:
 
 ```sh
-python3 scripts/release.py update-tap VERSION_TAG /path/to/homebrew-tap
+gh workflow run update-gitler.yml --repo lebedev-nikita/homebrew-tap
 ```
 
-Run that command from a checkout of the released version. The workflow also checks
-a three-minute pipeline budget; to measure a warmed build without publishing, run:
+The release workflow also checks a three-minute pipeline budget; to measure a
+warmed build without publishing, run:
 
 ```sh
 gh workflow run release.yml --ref main -f check_budget=true
