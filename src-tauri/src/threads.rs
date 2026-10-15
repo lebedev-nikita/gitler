@@ -46,6 +46,7 @@ struct Descriptor {
 struct NativeCli {
     binary: PathBuf,
     script: Option<PathBuf>,
+    app: Option<PathBuf>,
 }
 
 impl NativeCli {
@@ -54,6 +55,15 @@ impl NativeCli {
         if let Some(script) = &self.script {
             command.env("ELECTRON_RUN_AS_NODE", "1").arg(script);
         }
+        command
+    }
+
+    fn open_command(&self) -> Command {
+        let mut command = Command::new("open");
+        if let Some(app) = &self.app {
+            command.arg("-a").arg(app);
+        }
+        command.arg("t3code://app/");
         command
     }
 }
@@ -66,27 +76,32 @@ fn native_cli(home: &Path, version: &str) -> Result<NativeCli, String> {
     {
         return Err("T3 Code returned an invalid version.".into());
     }
-    let mut candidates = vec![NativeCli {
-        binary: home.join("runtime/versions").join(version).join("t3"),
-        script: None,
-    }];
+    let mut candidates = Vec::new();
     let mut apps = vec![PathBuf::from("/Applications")];
     if let Some(home) = std::env::var_os("HOME") {
         apps.push(PathBuf::from(home).join("Applications"));
     }
     for apps in apps {
         for name in ["T3 Code (Alpha)", "T3 Code", "T3 Code (Nightly)"] {
-            let contents = apps.join(format!("{name}.app/Contents"));
+            let app = apps.join(format!("{name}.app"));
+            let contents = app.join("Contents");
             candidates.push(NativeCli {
                 binary: contents.join("MacOS").join(name),
                 script: Some(contents.join("Resources/app.asar/apps/server/dist/bin.mjs")),
+                app: Some(app),
             });
         }
     }
+    candidates.push(NativeCli {
+        binary: home.join("runtime/versions").join(version).join("t3"),
+        script: None,
+        app: None,
+    });
     if let Some(paths) = std::env::var_os("PATH") {
         candidates.extend(std::env::split_paths(&paths).map(|path| NativeCli {
             binary: path.join("t3"),
             script: None,
+            app: None,
         }));
     }
     for candidate in candidates {
@@ -175,10 +190,15 @@ fn discover() -> Result<(PathBuf, Url, Descriptor, Client), String> {
     )?;
     let descriptor: Descriptor = serde_json::from_value(descriptor)
         .map_err(|_| "T3 Code returned invalid server information")?;
-    if descriptor.orchestration_protocol_version != Some(1) {
-        return Err("This Gitler integration supports T3 Code orchestration protocol 1 (including v0.0.45). This T3 Code version uses a different protocol.".into());
-    }
+    validate_protocol(&descriptor)?;
     Ok((home, origin, descriptor, client))
+}
+
+fn validate_protocol(descriptor: &Descriptor) -> Result<(), String> {
+    if !matches!(descriptor.orchestration_protocol_version, Some(1 | 2)) {
+        return Err("This Gitler integration supports T3 Code Alpha and Nightly with orchestration protocols 1 and 2. This T3 Code version uses an unsupported protocol.".into());
+    }
+    Ok(())
 }
 
 #[derive(Deserialize)]
@@ -262,6 +282,11 @@ impl Session {
         } else {
             self.client.get(url)
         };
+        let request = if self.descriptor.orchestration_protocol_version == Some(2) {
+            request.header("x-t3-orchestration-protocol", "2")
+        } else {
+            request
+        };
         response(
             request
                 .bearer_auth(&self.credential.token)
@@ -271,6 +296,21 @@ impl Session {
     }
 
     fn settings(&self) -> Result<Value, String> {
+        self.rpc("server.getSettings", &json!({}))
+    }
+
+    fn create_thread(&self, mut command: Value) -> Result<Value, String> {
+        if self.descriptor.orchestration_protocol_version == Some(2) {
+            command["createdBy"] = json!("user");
+            command["creationSource"] = json!("web");
+            self.rpc("orchestration.dispatchCommand", &command)
+        } else {
+            command["createdAt"] = json!(chrono::Utc::now().to_rfc3339());
+            self.request("api/orchestration/dispatch", Some(&command))
+        }
+    }
+
+    fn rpc(&self, tag: &str, payload: &Value) -> Result<Value, String> {
         let ticket = self.request("api/auth/websocket-ticket", Some(&json!({})))?;
         let ticket = ticket
             .get("ticket")
@@ -284,6 +324,10 @@ impl Session {
         url.set_scheme("ws")
             .map_err(|_| "Invalid T3 Code socket scheme")?;
         url.query_pairs_mut().append_pair("wsTicket", ticket);
+        if self.descriptor.orchestration_protocol_version == Some(2) {
+            url.query_pairs_mut()
+                .append_pair("orchestrationProtocol", "2");
+        }
         let address = self
             .origin
             .socket_addrs(|| Some(80))
@@ -306,12 +350,12 @@ impl Session {
             tungstenite::client::client_with_config(url.as_str(), stream, Some(config))
                 .map_err(|_| "T3 Code rejected the authenticated connection")?;
         let id = uuid::Uuid::new_v4().to_string();
-        socket.send(Message::Text(json!({ "_tag": "Request", "id": id, "tag": "server.getSettings", "payload": {}, "headers": [] }).to_string().into())).map_err(|_| "Could not request T3 Code settings")?;
+        socket.send(Message::Text(json!({ "_tag": "Request", "id": id, "tag": tag, "payload": payload, "headers": [] }).to_string().into())).map_err(|_| "Could not send the T3 Code request")?;
         let deadline = Instant::now() + Duration::from_secs(15);
         while Instant::now() < deadline {
-            let message = socket
-                .read()
-                .map_err(|_| "T3 Code did not return its settings")?;
+            let message = socket.read().map_err(|_| {
+                "T3 Code did not return a response. Check the app before trying again."
+            })?;
             let Message::Text(text) = message else {
                 continue;
             };
@@ -327,13 +371,16 @@ impl Session {
                 if frame["_tag"] == "Exit" && frame["requestId"] == id {
                     let _ = socket.close(None);
                     if frame["exit"]["_tag"] != "Success" {
-                        return Err("T3 Code denied access to its settings.".into());
+                        return Err(
+                            "T3 Code rejected the request. Check the app before trying again."
+                                .into(),
+                        );
                     }
                     return Ok(frame["exit"]["value"].clone());
                 }
             }
         }
-        Err("T3 Code settings request timed out.".into())
+        Err("T3 Code request timed out. Check the app before trying again.".into())
     }
 
     fn project(&self, common_dir: &str, root: &Path) -> Result<Value, String> {
@@ -397,9 +444,14 @@ fn selections(project: &Value, settings: &Value) -> Result<(Value, String), Stri
         let Some(id) = model["instanceId"].as_str() else {
             return false;
         };
+        if let Some(enabled) = overrides["providerInstances"][id]["enabled"].as_bool() {
+            return enabled;
+        }
         let provider = &settings["providerInstances"][id];
         if provider.is_null() {
-            return settings["providers"][id]["enabled"] == true;
+            return settings["providers"][id]["enabled"]
+                .as_bool()
+                .unwrap_or(["codex", "claudeAgent"].contains(&id));
         }
         if provider["enabled"] == false || provider["config"]["enabled"] == false {
             return false;
@@ -408,7 +460,7 @@ fn selections(project: &Value, settings: &Value) -> Result<(Value, String), Stri
             .as_bool()
             .or_else(|| provider["config"]["enabled"].as_bool())
             .unwrap_or(
-                !["cursor", "grok", "opencode", "antigravity"]
+                !["cursor", "grok", "muse", "pi", "opencode", "antigravity"]
                     .contains(&provider["driver"].as_str().unwrap_or("")),
             )
     };
@@ -476,21 +528,20 @@ pub fn start(
         "type": "thread.create", "commandId": uuid::Uuid::new_v4().to_string(),
         "threadId": thread_id, "projectId": project["id"], "title": branch,
         "modelSelection": model, "runtimeMode": mode, "interactionMode": "default",
-        "branch": branch, "worktreePath": worktree, "createdAt": chrono::Utc::now().to_rfc3339(),
+        "branch": branch, "worktreePath": worktree,
     });
-    let receipt = session
-        .request("api/orchestration/dispatch", Some(&command))
-        .map_err(|error| {
-            format!(
-                "{error} Worktree: {}. Thread ID: {thread_id}. Check T3 Code before trying again.",
-                worktree.display()
-            )
-        })?;
+    let receipt = session.create_thread(command).map_err(|error| {
+        format!(
+            "{error} Worktree: {}. Thread ID: {thread_id}. Check T3 Code before trying again.",
+            worktree.display()
+        )
+    })?;
     if !receipt["sequence"].is_number() {
         return Err(format!("T3 Code did not confirm creation. Thread ID: {thread_id}. Worktree: {}. Check T3 Code before trying again.", worktree.display()));
     }
-    let open_error = Command::new("open")
-        .arg("t3code://app/")
+    let open_error = session
+        .cli
+        .open_command()
         .status()
         .ok()
         .filter(|s| s.success())
@@ -569,6 +620,209 @@ pub fn open_instructions() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{BufRead, BufReader, Write};
+    use std::net::TcpListener;
+
+    fn http_reply(listener: &TcpListener, path: &str, protocol: u32, reply: Value) -> Value {
+        let (mut stream, _) = listener.accept().unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        let mut reader = BufReader::new(&mut stream);
+        let mut line = String::new();
+        reader.read_line(&mut line).unwrap();
+        assert_eq!(line.split_whitespace().nth(1), Some(path));
+        let mut headers = String::new();
+        loop {
+            line.clear();
+            reader.read_line(&mut line).unwrap();
+            if line == "\r\n" {
+                break;
+            }
+            assert!(!line.is_empty(), "incomplete HTTP headers");
+            headers.push_str(&line.to_ascii_lowercase());
+        }
+        assert!(headers.contains("authorization: bearer fixture-token\r\n"));
+        assert_eq!(
+            headers.contains("x-t3-orchestration-protocol: 2\r\n"),
+            protocol == 2
+        );
+        let length = headers
+            .lines()
+            .find_map(|line| line.strip_prefix("content-length: "))
+            .map(|length| length.parse().unwrap())
+            .unwrap_or(0);
+        let mut body = vec![0; length];
+        reader.read_exact(&mut body).unwrap();
+        let body = if body.is_empty() {
+            Value::Null
+        } else {
+            serde_json::from_slice(&body).unwrap()
+        };
+        let reply = reply.to_string();
+        write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{reply}", reply.len()).unwrap();
+        body
+    }
+
+    fn rpc_reply(listener: &TcpListener, protocol: u32, tag: &str, reply: Value) -> Value {
+        http_reply(
+            listener,
+            "/api/auth/websocket-ticket",
+            protocol,
+            json!({"ticket":"fixture-ticket"}),
+        );
+        let (stream, _) = listener.accept().unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        let mut socket = tungstenite::accept_hdr(
+            stream,
+            |request: &tungstenite::handshake::server::Request, response| {
+                let url = Url::parse(&format!("http://localhost{}", request.uri())).unwrap();
+                assert_eq!(url.path(), "/ws");
+                assert!(url
+                    .query_pairs()
+                    .any(|(key, value)| key == "wsTicket" && value == "fixture-ticket"));
+                assert_eq!(
+                    url.query_pairs()
+                        .any(|(key, value)| key == "orchestrationProtocol" && value == "2"),
+                    protocol == 2
+                );
+                Ok(response)
+            },
+        )
+        .unwrap();
+        let frame: Value = serde_json::from_str(socket.read().unwrap().to_text().unwrap()).unwrap();
+        assert_eq!(frame["tag"], tag);
+        assert_eq!(frame["_tag"], "Request");
+        // Both generations may batch frames and send keepalives before the reply.
+        socket.send(Message::Text(json!([{"_tag":"Ping"}, {"_tag":"Exit", "requestId":"unrelated", "exit":{"_tag":"Success","value":null}}]).to_string().into())).unwrap();
+        let pong: Value = serde_json::from_str(socket.read().unwrap().to_text().unwrap()).unwrap();
+        assert_eq!(pong["_tag"], "Pong");
+        socket.send(Message::Text(json!({"_tag":"Exit", "requestId":frame["id"], "exit":{"_tag":"Success", "value":reply}}).to_string().into())).unwrap();
+        frame["payload"].clone()
+    }
+
+    #[test]
+    fn alpha_and_nightly_use_their_advertised_protocol_and_transport() {
+        for (protocol, version) in [(1, "0.0.45"), (2, "0.0.46-nightly.20261015.3145")] {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let origin = origin(&format!("http://{}", listener.local_addr().unwrap())).unwrap();
+            let server = std::thread::spawn(move || {
+                http_reply(
+                    &listener,
+                    "/api/orchestration/shell",
+                    protocol,
+                    json!({"projects":[]}),
+                );
+                assert_eq!(
+                    rpc_reply(
+                        &listener,
+                        protocol,
+                        "server.getSettings",
+                        json!({"defaultRuntimeMode":"auto"})
+                    ),
+                    json!({})
+                );
+                let command = if protocol == 1 {
+                    http_reply(
+                        &listener,
+                        "/api/orchestration/dispatch",
+                        protocol,
+                        json!({"sequence":42}),
+                    )
+                } else {
+                    rpc_reply(
+                        &listener,
+                        protocol,
+                        "orchestration.dispatchCommand",
+                        json!({"sequence":42}),
+                    )
+                };
+                assert_eq!(command["type"], "thread.create");
+                assert_eq!(command["worktreePath"], "/fixture/existing-worktree");
+                assert_eq!(command["branch"], "feature");
+                assert_eq!(command["modelSelection"]["model"], "project-model");
+                assert_eq!(command["runtimeMode"], "auto");
+                if protocol == 1 {
+                    assert!(command["createdAt"].is_string());
+                    assert!(command.get("createdBy").is_none());
+                } else {
+                    assert!(command.get("createdAt").is_none());
+                    assert_eq!(command["createdBy"], "user");
+                    assert_eq!(command["creationSource"], "web");
+                }
+            });
+            let descriptor = Descriptor {
+                server_version: version.into(),
+                environment_id: "fixture".into(),
+                orchestration_protocol_version: Some(protocol),
+            };
+            validate_protocol(&descriptor).unwrap();
+            let session = Session {
+                home: PathBuf::from("/fixture"),
+                origin,
+                descriptor,
+                client: Client::builder()
+                    .no_proxy()
+                    .timeout(Duration::from_secs(3))
+                    .build()
+                    .unwrap(),
+                cli: NativeCli {
+                    binary: PathBuf::from("/usr/bin/true"),
+                    script: None,
+                    app: None,
+                },
+                credential: Credential {
+                    session_id: "fixture-session".into(),
+                    token: "fixture-token".into(),
+                },
+            };
+            assert!(
+                session.request("api/orchestration/shell", None).unwrap()["projects"].is_array()
+            );
+            assert_eq!(session.settings().unwrap()["defaultRuntimeMode"], "auto");
+            let receipt = session.create_thread(json!({
+                "type":"thread.create", "commandId":"command", "threadId":"thread", "projectId":"project", "title":"feature",
+                "modelSelection":{"instanceId":"codex", "model":"project-model"}, "runtimeMode":"auto", "interactionMode":"default",
+                "branch":"feature", "worktreePath":"/fixture/existing-worktree",
+            })).unwrap();
+            assert_eq!(receipt["sequence"], 42);
+            server.join().unwrap();
+        }
+    }
+
+    #[test]
+    fn rejects_unknown_protocols_even_for_a_known_release() {
+        for protocol in [None, Some(0), Some(3)] {
+            assert!(validate_protocol(&Descriptor {
+                server_version: "0.0.45".into(),
+                environment_id: "fixture".into(),
+                orchestration_protocol_version: protocol,
+            })
+            .is_err());
+        }
+    }
+
+    #[test]
+    fn opens_the_matching_desktop_channel() {
+        for name in ["T3 Code (Alpha)", "T3 Code (Nightly)"] {
+            let app = PathBuf::from(format!("/Applications/{name}.app"));
+            let cli = NativeCli {
+                binary: app.join(format!("Contents/MacOS/{name}")),
+                script: None,
+                app: Some(app.clone()),
+            };
+            assert_eq!(
+                cli.open_command().get_args().collect::<Vec<_>>(),
+                [
+                    std::ffi::OsStr::new("-a"),
+                    app.as_os_str(),
+                    std::ffi::OsStr::new("t3code://app/")
+                ]
+            );
+        }
+    }
 
     #[test]
     fn only_accepts_loopback_origins_without_redirect_or_credentials() {
@@ -615,6 +869,39 @@ mod tests {
         );
         settings["projectSettingsOverrides"]["project"]["defaultModelSelection"] = Value::Null;
         assert!(selections(&project, &settings).is_err());
+    }
+
+    #[test]
+    fn supports_builtin_defaults_and_project_provider_enablement() {
+        let project = json!({"id":"project"});
+        let mut settings = json!({
+            "defaultModelSelection":{"instanceId":"codex", "model":"default"},
+            "defaultRuntimeMode":"auto", "providerInstances":{},
+            "projectSettingsOverrides":{},
+        });
+        assert!(selections(&project, &settings).is_ok());
+        settings["defaultModelSelection"]["instanceId"] = json!("claudeAgent");
+        assert!(selections(&project, &settings).is_ok());
+        settings["defaultModelSelection"]["instanceId"] = json!("unknown");
+        assert!(selections(&project, &settings).is_err());
+        settings["defaultModelSelection"]["instanceId"] = json!("codex");
+        settings["providers"] = json!({"codex":{"enabled":false}});
+        assert!(selections(&project, &settings).is_err());
+        settings["providerInstances"]["codex"] = json!({"driver":"codex", "enabled":false});
+        assert!(selections(&project, &settings).is_err());
+        settings["projectSettingsOverrides"]["project"] =
+            json!({"providerInstances":{"codex":{"enabled":true}}});
+        assert!(selections(&project, &settings).is_ok());
+        settings["providerInstances"]["codex"]["enabled"] = json!(true);
+        settings["projectSettingsOverrides"]["project"]["providerInstances"]["codex"]["enabled"] =
+            json!(false);
+        assert!(selections(&project, &settings).is_err());
+        settings["projectSettingsOverrides"]["project"] = json!({});
+        settings["defaultModelSelection"]["instanceId"] = json!("pi");
+        settings["providerInstances"]["pi"] = json!({"driver":"pi"});
+        assert!(selections(&project, &settings).is_err());
+        settings["providerInstances"]["pi"]["config"] = json!({"enabled":true});
+        assert!(selections(&project, &settings).is_ok());
     }
 
     #[test]
