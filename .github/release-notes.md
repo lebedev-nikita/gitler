@@ -1,7 +1,9 @@
-Gitler 0.5.2-rc.4 adds **Pull** to the local branch context menu.
+Gitler 0.5.2 hides T3 service checkpoints from repository history and includes the improvements from the 0.5.2 release candidates.
 
 ## Changes
 
+- Exclude all `refs/t3/*` service refs from the commit graph and commit-hash search, regardless of checkpoint format. Keep the stored checkpoints available to T3 Code.
+- Preserve real history and detached worktree commits when service checkpoints exceed the history page size.
 - Right-click a local branch label, its tip commit, or its uncommitted node and choose **Pull**.
 - Fetch the configured upstream and fast-forward the selected branch and its registered worktree. Branches without a worktree update without checking them out.
 - Show progress and actionable errors, then refresh the graph.
