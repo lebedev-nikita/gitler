@@ -1,8 +1,7 @@
 # Icon sources
 
 `base.png` is the unmodified replacement PNG provided by the user, including
-the Gitler wordmark. Its large cream hair sweep is on the left, with the small
-separated lock on the right.
+the Gitler wordmark.
 The Tauri bundle icons are generated from it with the official Tauri CLI.
 
 `mark.png` is the text-free variant created with the built-in ImageGen tool.
@@ -12,9 +11,3 @@ T3 Code uses this source through `t3.json`.
 
 `favicon.png` (256 pixels) and `favicon.ico` (16, 32, 48, and 64 pixels) are
 resized exports of `mark.png` made with ImageMagick, referenced by `index.html`.
-
-## Generation prompt
-
-```text
-undefined
-```
