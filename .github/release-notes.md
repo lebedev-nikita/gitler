@@ -1,10 +1,10 @@
-Gitler 0.5.3 supports creating threads in both T3 Code Alpha and Nightly.
+Gitler 0.5.4 fixes an extra scrollbar appearing while quickly scrolling changed files.
 
 ## Changes
 
-- Support orchestration protocols 1 and 2, including Nightly's WebSocket API for thread creation.
-- Respect built-in provider defaults and project-specific provider enablement when choosing the thread model.
-- Open the matching T3 Code application after creating a thread.
+- Keep file tooltips from expanding the page when their rows scroll out of view.
+- Hide tooltips when their anchor is outside the visible list.
+- Add regression coverage for long file lists in wide and narrow windows, with and without the diff preview.
 
 ## Downloads
 
