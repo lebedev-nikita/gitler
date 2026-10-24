@@ -28,11 +28,12 @@ function TooltipContent({
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Positioner
+        positionMethod="fixed"
         align={align}
         alignOffset={alignOffset}
         side={side}
         sideOffset={sideOffset}
-        className="isolate z-50"
+        className="isolate z-50 data-anchor-hidden:invisible"
       >
         <TooltipPrimitive.Popup
           data-slot="tooltip-content"
