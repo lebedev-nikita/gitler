@@ -10,3 +10,4 @@ test-results/
 .impeccable/build/
 __pycache__/
 *.pyc
+.claude/settings.local.json
